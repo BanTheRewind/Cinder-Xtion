@@ -1,0 +1,29 @@
+<OpenNI>
+	<Licenses>
+		<License vendor="PrimeSense" key="0r+QjRcwSWJ7lPWVnMoRKn5cdY4="/>
+	</Licenses>
+	<Log writeToConsole="false" writeToFile="false">
+		<!-- 0 - Verbose, 1 - Info, 2 - Warning, 3 - Error (default) -->
+		<LogLevel value="0"/>
+		<Masks>
+			<Mask name="ALL" on="true"/>
+		</Masks>
+		<Dumps>
+		</Dumps>
+	</Log>
+	<ProductionNodes>
+		<Node type="IR" name="IR1">
+			<Configuration>
+				<MapOutputMode xRes="320" yRes="240" FPS="30"/>
+				<Mirror on="true"/>
+			</Configuration>
+		</Node>
+		<Node type="Depth" name="Depth1">
+			<Configuration>
+				<MapOutputMode xRes="320" yRes="240" FPS="30"/>
+				<Mirror on="true"/>
+			</Configuration>
+		</Node>
+		<Node type="User" name="User1"></Node>
+	</ProductionNodes>
+</OpenNI>
