@@ -114,6 +114,9 @@ namespace Xtion
 		} catch ( ... ) {
 		}
 
+		if ( mDataAudio != 0 ) {
+			delete [] mDataAudio;
+		}
 		if ( mDataDepth != 0 ) {
 			delete [] mDataDepth;
 		}
@@ -164,22 +167,12 @@ namespace Xtion
 	{
 		boost::lock_guard<boost::mutex> lock( mMutexAudio );
 		mNewAudio = false;
-		return mAudioBuffer;
+		return mDataAudio;
 	}
 
 	uint32_t Device::getAudioBufferSize() const
 	{
-		return mAudioBufferSize;
-	}
-	
-	float Device::getDepthAt( const ci::Vec2i &position )
-	{
-		float depthNorm = 0.0f;
-		if ( mChannelDepth ) {
-			uint16_t depth = mChannelDepth.getValue( position );
-			depthNorm = (float)( depth / ( 1.0 * 0x8000 ) );
-		}
-		return depthNorm;
+		return mDataAudioSize;
 	}
 
 	Channel16u Device::getDepth()
@@ -189,11 +182,31 @@ namespace Xtion
 		return mChannelDepth;
 	}
 
+	float Device::getDepthAt( const ci::Vec2i &position )
+	{
+		if ( mChannelDepth ) {
+			return (float)( mChannelDepth.getValue( position ) / ( 1.0 * 0x8000 ) );
+		}
+		return 0.0f;
+	}
+
+	Vec2i Device::getDepthSize()
+	{
+		boost::lock_guard<boost::mutex> lock( mMutexDepth );
+		return mSizeDepth;
+	}
+
 	Channel16u Device::getInfrared()
 	{
 		boost::lock_guard<boost::mutex> lock( mMutexInfrared );
 		mNewInfraredFrame = false;
 		return mChannelInfrared;
+	}
+
+	Vec2i Device::getInfraredSize()
+	{
+		boost::lock_guard<boost::mutex> lock( mMutexInfrared );
+		return mSizeInfrared;
 	}
 
 	vector<Skeleton> Device::getSkeletons()
@@ -210,10 +223,16 @@ namespace Xtion
 		return mSurfaceVideo;
 	}
 
+	Vec2i Device::getVideoSize()
+	{
+		boost::lock_guard<boost::mutex> lock( mMutexVideo );
+		return mSizeVideo;
+	}
+
 	void Device::init()
 	{
-		mAudioBuffer				= 0;
-		mAudioBufferSize			= 0;
+		mDataAudio					= 0;
+		mDataAudioSize				= 0;
 		mBinary						= false;
 		mCalibrationPoseRequired	= true;
 		mCapture					= false;
@@ -233,6 +252,9 @@ namespace Xtion
 		mNewVideoFrame				= false;
 		mPaused						= false;
 		mRemoveBackground			= false;
+		mSizeDepth					= Vec2i::zero();
+		mSizeInfrared				= Vec2i::zero();
+		mSizeVideo					= Vec2i::zero();
 		mRunning					= false;
 		mSkeletons.clear();
 	}
@@ -325,30 +347,35 @@ namespace Xtion
 					if ( mEnabledAudio ) {
 						mGeneratorAudio.GetMetaData( mMetaDataAudio );
 						const uint_fast8_t* buffer = mGeneratorAudio.GetAudioBuffer();
-						mAudioBufferSize = mGeneratorAudio.GetDataSize();
-						memcpy( mAudioBuffer, buffer, mAudioBufferSize );
+						mDataAudioSize = mGeneratorAudio.GetDataSize();
+						if ( mDataAudio == 0 ) {
+							mDataAudio = new uint_fast8_t[ mDataAudioSize * 2 ]; // 2 = channels
+						}
+						memcpy( mDataAudio, buffer, mDataAudioSize );
 						mNewAudio = true;
 					}
 
 					if ( mEnabledDepth ) {
 						mGeneratorDepth.GetMetaData( mMetaDataDepth );
-						uint32_t count = mMetaDataDepth.XRes() * mMetaDataDepth.YRes();
+						mSizeDepth = Vec2i( mMetaDataDepth.XRes(), mMetaDataDepth.YRes() );
+						uint32_t count = mSizeDepth.x * mSizeDepth.y;
 						mDataDepth = (uint16_t*)mMetaDataDepth.Data();
 						if ( !mChannelDepth ) {
-							mChannelDepth = Channel16u( mMetaDataDepth.XRes(), mMetaDataDepth.YRes() );
+							mChannelDepth = Channel16u( mSizeDepth.x, mSizeDepth.y );
 						}
-						memcpy( mChannelDepth.getData(), mDataDepth, count * sizeof( uint16_t ) );
+						memcpy( mChannelDepth.getData(), mDataDepth, count * mMetaDataDepth.BytesPerPixel() );
 						mNewDepthFrame = true;
 					}
 
 					if ( mEnabledInfrared ) {
 						mGeneratorInfrared.GetMetaData( mMetaDataInfrared );
-						uint32_t count = mMetaDataInfrared.XRes() * mMetaDataInfrared.YRes();
-						mDataInfrared = (uint8_t*)mMetaDataInfrared.Data();
+						mSizeInfrared = Vec2i( mMetaDataInfrared.XRes(), mMetaDataInfrared.YRes() );
+						uint32_t count = mSizeInfrared.x * mSizeInfrared.y;
+						mDataInfrared = (uint16_t*)mMetaDataInfrared.Data();
 						if ( !mChannelInfrared ) {
-							mChannelInfrared = Channel8u( mMetaDataInfrared.XRes(), mMetaDataInfrared.YRes() );
+							mChannelInfrared = Channel16u( mSizeInfrared.x, mSizeInfrared.y );
 						}
-						memcpy( mChannelInfrared.getData(), mDataInfrared, count * sizeof( uint8_t ) );
+						memcpy( mChannelInfrared.getData(), mDataInfrared, count * mMetaDataInfrared.BytesPerPixel() );
 						mNewInfraredFrame = true;
 					}
 
@@ -358,12 +385,13 @@ namespace Xtion
 
 					if ( mEnabledVideo ) {
 						mGeneratorVideo.GetMetaData( mMetaDataVideo );
-						uint32_t count = mMetaDataVideo.XRes() * mMetaDataVideo.YRes();
+						mSizeVideo = Vec2i( mMetaDataVideo.XRes(), mMetaDataVideo.YRes() );
+						uint32_t count = mSizeVideo.x * mSizeVideo.y;
 						mDataVideo = (uint8_t*)mMetaDataVideo.Data();
 						if ( !mSurfaceVideo ) {
-							mSurfaceVideo = Surface8u( mMetaDataVideo.XRes(), mMetaDataVideo.YRes(), false, SurfaceChannelOrder::RGB );
+							mSurfaceVideo = Surface8u(  mSizeVideo.x, mSizeVideo.y, false, SurfaceChannelOrder::RGB );
 						}
-						memcpy( mSurfaceVideo.getData(), mDataVideo, count * 3 * sizeof( uint8_t ) );
+						memcpy( mSurfaceVideo.getData(), mDataVideo, count * mMetaDataVideo.BytesPerPixel() );
 						mNewVideoFrame = true;
 					}
 				}
@@ -399,7 +427,7 @@ namespace Xtion
 			waveMode.nSampleRate	= 44100;
 			waveMode.nChannels		= 2;
 			waveMode.nBitsPerSample	= 16;
-			status = mGeneratorAudio.SetWaveOutputMode(waveMode);
+			status = mGeneratorAudio.SetWaveOutputMode( waveMode );
 			if ( success( status ) ) {
 				mEnabledAudio = true;
 			}

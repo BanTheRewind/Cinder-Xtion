@@ -48,7 +48,7 @@
 * This application demonstrates how to represent the 
 * Xtion's depth image in 3D space.
 */
-class PointCloudApp : public ci::app::AppBasic 
+class BasicApp : public ci::app::AppBasic 
 {
 
 public:
@@ -77,7 +77,6 @@ private:
 	ci::CameraPersp			mCamera;
 
 	ci::Channel16u			mDepth;
-	ci::Channel8u			mInfrared;
 	ci::Surface8u			mVideo;
 
 	// Save screen shot
@@ -92,23 +91,24 @@ using namespace Xtion;
 using namespace std;
 
 // Render
-void PointCloudApp::draw()
+void BasicApp::draw()
 {
 
 	// Clear window
 	gl::setViewport( getWindowBounds() );
 	gl::clear( Colorf::black() );
 
+	// Half window size
+	float width = getWindowCenter().x;
+	float height = getWindowCenter().y;
+
 	gl::setMatricesWindow( getWindowSize() );
 	gl::color( ColorAf::white() );
 	if ( mDepth ) {
-		gl::draw( gl::Texture( mDepth ), mDepth.getBounds(), Rectf( 0.0f, 0.0f, (float)getWindowWidth() * 0.5f, (float)getWindowHeight() * 0.5f ) );
-	}
-	if ( mInfrared ) {
-		gl::draw( gl::Texture( mInfrared ), mInfrared.getBounds(), Rectf( (float)getWindowWidth() * 0.5f, 0.0f, (float)getWindowWidth(), (float)getWindowHeight() * 0.5f ) );
+		gl::draw( gl::Texture( mDepth ), mDepth.getBounds(), Rectf( 0.0f, height * 0.5f, width, height * 1.5f ) );
 	}
 	if ( mVideo ) {
-		gl::draw( gl::Texture( mVideo ), mVideo.getBounds(), Rectf( 0.0f, (float)getWindowHeight() * 0.5f, (float)getWindowWidth() * 0.5f, (float)getWindowHeight() ) );
+		gl::draw( gl::Texture( mVideo ), mVideo.getBounds(), Rectf( width, height * 0.5f, width * 2.0f, height * 1.5f ) );
 	}
 	gl::setMatrices( mCamera );
 	gl::rotate( mArcball.getQuat() );
@@ -125,7 +125,7 @@ void PointCloudApp::draw()
 }
 
 // Handles key press
-void PointCloudApp::keyDown( KeyEvent event )
+void BasicApp::keyDown( KeyEvent event )
 {
 	switch ( event.getCode() ) {
 	case KeyEvent::KEY_ESCAPE:
@@ -140,31 +140,31 @@ void PointCloudApp::keyDown( KeyEvent event )
 	}
 }
 
-void PointCloudApp::mouseDown( ci::app::MouseEvent event )
+void BasicApp::mouseDown( ci::app::MouseEvent event )
 {
 	mArcball.mouseDown( event.getPos() );
 }
 
-void PointCloudApp::mouseDrag( ci::app::MouseEvent event )
+void BasicApp::mouseDrag( ci::app::MouseEvent event )
 {
 	mArcball.mouseDrag( event.getPos() );
 }
 
 // Prepare window
-void PointCloudApp::prepareSettings( Settings * settings )
+void BasicApp::prepareSettings( Settings * settings )
 {
-	settings->setWindowSize( 800, 600 );
 	settings->setFrameRate( 60.0f );
+	settings->setWindowSize( 800, 600 );
 }
 
 // Take screen shot
-void PointCloudApp::screenShot()
+void BasicApp::screenShot()
 {
 	writeImage( getAppPath() / fs::path( "frame" + toString( getElapsedFrames() ) + ".png" ), copyWindowSurface() );
 }
 
 // Set up
-void PointCloudApp::setup()
+void BasicApp::setup()
 {
 
 	// Set up OpenGL
@@ -176,7 +176,7 @@ void PointCloudApp::setup()
 	gl::enableAdditiveBlending();
 	gl::color( ColorAf::white() );
 
-	mInputSize = Vec2i( 640, 480 );
+	mInputSize = Vec2i::zero();
 
 	// Start Xtion
 	mDevice = Device::create();
@@ -191,22 +191,18 @@ void PointCloudApp::setup()
 }
 
 // Called on exit
-void PointCloudApp::shutdown()
+void BasicApp::shutdown()
 {
 	mDevice->stop();
 	mPoints.clear();
 }
 
 // Runs update logic
-void PointCloudApp::update()
+void BasicApp::update()
 {
 
 	// Device is capturing
 	if ( mDevice->isCapturing() ) {
-
-		if ( mDevice->checkNewInfraredFrame() ) {
-			mInfrared = mDevice->getInfrared();
-		}
 
 		if ( mDevice->checkNewVideoFrame() ) {
 			mVideo = mDevice->getVideo();
@@ -215,39 +211,6 @@ void PointCloudApp::update()
 		// Check for latest depth map
 		if ( mDevice->checkNewDepthFrame() ) {
 			mDepth = mDevice->getDepth();
-			
-			return;
-			
-			// Clear point list
-			Vec3f offset( Vec2f( mInputSize ) * Vec2f( -0.5f, 0.5f ) );
-			offset.z = mCamera.getEyePoint().z * 0.5f;
-			Vec3f position = Vec3f::zero();
-			mPoints.clear();
-
-			// Iterate image rows
-			for ( int32_t y = 0; y < mInputSize.y; y++ ) {
-				for ( int32_t x = 0; x < mInputSize.x; x++ ) {
-
-					// Read depth as 0.0 - 1.0 float
-					float depth = mDevice->getDepthAt( Vec2i( x, y ) );
-
-					// Add position to point list
-					if ( depth > 0.0f ) {
-						position.z = depth * mCamera.getEyePoint().z * 2.0f;
-						mPoints.push_back( position * Vec3f( 1.1f, -1.1f, 1.0f ) + offset );
-					}
-
-					// Shift point
-					position.x++;
-
-				}
-
-				// Update position
-				position.x = 0.0f;
-				position.y++;
-
-			}
-
 		}
 
 	}
@@ -255,4 +218,4 @@ void PointCloudApp::update()
 }
 
 // Run application
-CINDER_APP_BASIC( PointCloudApp, RendererGl )
+CINDER_APP_BASIC( BasicApp, RendererGl )

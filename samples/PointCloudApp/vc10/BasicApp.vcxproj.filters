@@ -16,11 +16,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\PointCloudApp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\CinderXtion.cpp">
       <Filter>blocks\Cinder-Xtion</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\BasicApp.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
