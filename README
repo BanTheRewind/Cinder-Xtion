@@ -1,6 +1,5 @@
 THIS IS A WORK IN PROGRESS. Initial development is 
-not complete, therefore this block is currently 
-non-functioning.
+not complete.  Some parts of this block do not yet function.
 
 This block wraps OpenNI for use with the Asus Xtion. 
 It is recommend that the PrimeSense drivers, OpenNI, 
