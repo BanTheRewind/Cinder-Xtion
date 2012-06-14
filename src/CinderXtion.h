@@ -107,8 +107,10 @@ namespace Xtion
 		ci::Channel16u					getInfrared();
 		ci::Vec2i						getInfraredSize();
 
-		bool							checkNewSkeletons();
+		bool							checkNewUserData();
 		std::vector<Skeleton>			getSkeletons();
+		ci::Channel16u					getUserImage();
+		ci::Vec2i						getUserImageSize();
 
 		bool							checkNewVideoFrame();
 		ci::Surface8u					getVideo();
@@ -187,22 +189,25 @@ namespace Xtion
 		volatile bool					mNewAudio;
 		volatile bool					mNewDepthFrame;
 		volatile bool					mNewInfraredFrame;
-		volatile bool					mNewSkeletons;
+		volatile bool					mNewUserData;
 		volatile bool					mNewVideoFrame;
 
 		uint16_t						*mDataDepth;
 		uint16_t						*mDataInfrared;
+		uint16_t						*mDataUserImage;
 		uint8_t							*mDataVideo;
 
 		uint_fast8_t					*mDataAudio;
 		volatile size_t					mDataAudioSize;
 		ci::Channel16u					mChannelDepth;
 		ci::Channel16u					mChannelInfrared;
+		ci::Channel16u					mChannelUserImage;
 		ci::Surface8u					mSurfaceVideo;
 		std::vector<Skeleton>			mSkeletons;
 
 		ci::Vec2i						mSizeDepth;
 		ci::Vec2i						mSizeInfrared;
+		ci::Vec2i						mSizeUserImage;
 		ci::Vec2i						mSizeVideo;
 	};
 

@@ -78,6 +78,7 @@ private:
 
 	ci::Channel16u			mDepth;
 	ci::Surface8u			mVideo;
+	ci::Channel16u			mUserImage;
 
 	// Save screen shot
 	void					screenShot();
@@ -106,6 +107,9 @@ void BasicApp::draw()
 	gl::color( ColorAf::white() );
 	if ( mDepth ) {
 		gl::draw( gl::Texture( mDepth ), mDepth.getBounds(), Rectf( 0.0f, height * 0.5f, width, height * 1.5f ) );
+	}
+	if ( mUserImage ) {
+		gl::draw( gl::Texture( mUserImage ), mUserImage.getBounds(), Rectf( 0.0f, height * 0.5f, width, height * 1.5f ) );
 	}
 	if ( mVideo ) {
 		gl::draw( gl::Texture( mVideo ), mVideo.getBounds(), Rectf( width, height * 0.5f, width * 2.0f, height * 1.5f ) );
@@ -203,16 +207,15 @@ void BasicApp::update()
 
 	// Device is capturing
 	if ( mDevice->isCapturing() ) {
-
-		if ( mDevice->checkNewVideoFrame() ) {
-			mVideo = mDevice->getVideo();
-		}
-
-		// Check for latest depth map
 		if ( mDevice->checkNewDepthFrame() ) {
 			mDepth = mDevice->getDepth();
 		}
-
+		if ( mDevice->checkNewUserData() ) {
+			mUserImage = mDevice->getUserImage();
+		}
+		if ( mDevice->checkNewVideoFrame() ) {
+			mVideo = mDevice->getVideo();
+		}
 	}
 
 }

@@ -149,11 +149,11 @@ namespace Xtion
 		return newFrame;
 	}
 
-	bool Device::checkNewSkeletons()
+	bool Device::checkNewUserData()
 	{
-		bool newSkeletons = mNewSkeletons;
-		mNewSkeletons = false;
-		return newSkeletons;
+		bool newUserData = mNewUserData;
+		mNewUserData = false;
+		return newUserData;
 	}
 
 	bool Device::checkNewVideoFrame()
@@ -212,8 +212,21 @@ namespace Xtion
 	vector<Skeleton> Device::getSkeletons()
 	{
 		boost::lock_guard<boost::mutex> lock( mMutexUser );
-		mNewSkeletons = false;
+		mNewUserData = false;
 		return mSkeletons;
+	}
+
+	Channel16u Device::getUserImage()
+	{
+		boost::lock_guard<boost::mutex> lock( mMutexUser );
+		mNewUserData = false;
+		return mChannelUserImage;
+	}
+
+	Vec2i Device::getUserImageSize()
+	{
+		boost::lock_guard<boost::mutex> lock( mMutexUser );
+		return mSizeUserImage;
 	}
 
 	Surface8u Device::getVideo()
@@ -238,6 +251,7 @@ namespace Xtion
 		mCapture					= false;
 		mDataDepth					= 0;
 		mDataInfrared				= 0;
+		mDataUserImage				= 0;
 		mDataVideo					= 0;
 		mEnabledAudio				= false;
 		mEnabledDepth				= false;
@@ -248,12 +262,13 @@ namespace Xtion
 		mGreyScale					= false;
 		mInverted					= false;
 		mNewDepthFrame				= false;
-		mNewSkeletons				= false;
+		mNewUserData				= false;
 		mNewVideoFrame				= false;
 		mPaused						= false;
 		mRemoveBackground			= false;
 		mSizeDepth					= Vec2i::zero();
 		mSizeInfrared				= Vec2i::zero();
+		mSizeUserImage				= Vec2i::zero();
 		mSizeVideo					= Vec2i::zero();
 		mRunning					= false;
 		mSkeletons.clear();
@@ -379,8 +394,16 @@ namespace Xtion
 						mNewInfraredFrame = true;
 					}
 
-					if ( mEnabledUserTracking ) {
-
+					if ( mEnabledUserTracking && mGeneratorUser.IsNewDataAvailable() ) {
+						mGeneratorUser.GetUserPixels( 0, mMetaDataScene );
+						mSizeUserImage = Vec2i( mMetaDataScene.XRes(), mMetaDataScene.YRes() );
+						uint32_t count = mSizeUserImage.x * mSizeUserImage.y;
+						mDataUserImage = (uint16_t*)mMetaDataScene.Data();
+						if ( !mChannelUserImage ) {
+							mChannelUserImage = Channel16u( mSizeInfrared.x, mSizeInfrared.y );
+						}
+						memcpy( mChannelUserImage.getData(), mDataUserImage, count * mMetaDataScene.BytesPerPixel() );
+						mNewUserData = true;
 					}
 
 					if ( mEnabledVideo ) {
