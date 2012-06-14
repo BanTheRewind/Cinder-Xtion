@@ -185,7 +185,7 @@ namespace Xtion
 	float Device::getDepthAt( const ci::Vec2i &position )
 	{
 		if ( mChannelDepth ) {
-			return (float)( mChannelDepth.getValue( position ) / ( 1.0 * 0x8000 ) );
+			return 1.0f - (float)( mChannelDepth.getValue( position ) / ( 1.0 * 0x8000 ) ) * 10.0f;
 		}
 		return 0.0f;
 	}
