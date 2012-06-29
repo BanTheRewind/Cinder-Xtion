@@ -69,7 +69,7 @@ namespace Xtion
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	Bone::Bone( JointName jointName, const Vec3f &position )
+	Bone::Bone( XnSkeletonJoint jointName, const Vec3f &position )
 		: mJointName( jointName ), mPosition( position )
 	{
 	}
@@ -78,17 +78,295 @@ namespace Xtion
 	{
 		return mPosition;
 	}
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	Vec2i DeviceOptions::getResolutionSize( XnResolution resolution )
+	{
+		Vec2i size = Vec2i::zero();
+		switch ( resolution ) {
+		case XnResolution::XN_RES_1080P:
+			size = Vec2i( XN_1080P_X_RES, XN_1080P_Y_RES );
+			break;
+		case XnResolution::XN_RES_240P:
+			size = Vec2i( XN_240P_X_RES, XN_240P_Y_RES );
+			break;
+		case XnResolution::XN_RES_480P:
+			size = Vec2i( XN_480P_X_RES, XN_480P_Y_RES );
+			break;
+		case XnResolution::XN_RES_576P:
+			size = Vec2i( XN_576P_X_RES, XN_576P_Y_RES );
+			break;
+		case XnResolution::XN_RES_720P:
+			size = Vec2i( XN_720P_X_RES, XN_720P_Y_RES );
+			break;
+		case XnResolution::XN_RES_CGA:
+			size = Vec2i( XN_CGA_X_RES, XN_CGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_CIF:
+			size = Vec2i( XN_CIF_X_RES, XN_CIF_Y_RES );
+			break;
+		case XnResolution::XN_RES_DV:
+			size = Vec2i( XN_DV_X_RES, XN_DV_Y_RES );
+			break;
+		case XnResolution::XN_RES_QCIF:
+			size = Vec2i( XN_QCIF_X_RES, XN_QCIF_Y_RES );
+			break;
+		case XnResolution::XN_RES_QQVGA:
+			size = Vec2i( XN_QQVGA_X_RES, XN_QQVGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_QVGA:
+			size = Vec2i( XN_QVGA_X_RES, XN_QVGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_SVGA:
+			size = Vec2i( XN_SVGA_X_RES, XN_SVGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_SXGA:
+			size = Vec2i( XN_SXGA_X_RES, XN_SXGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_UXGA:
+			size = Vec2i( XN_UXGA_X_RES, XN_UXGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_VGA:
+			size = Vec2i( XN_VGA_X_RES, XN_VGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_WVGA:
+			size = Vec2i( XN_WVGA_X_RES, XN_WVGA_Y_RES );
+			break;
+		case XnResolution::XN_RES_XGA:
+			size = Vec2i( XN_XGA_X_RES, XN_XGA_Y_RES );
+			break;
+		default:
+			break;
+		}
+		return size;
+	}
+
+	DeviceOptions::DeviceOptions()
+	{
+		setDeviceId();
+		setDeviceIndex();
+
+		enableAudio( false );
+		enableDepth( true );
+		enableInfrared( false );
+		enableUserTracking( false, false );
+		enableVideo( true );
+
+		setDepthFrameRate();
+		setInfraredFrameRate();
+		setVideoFrameRate();
+
+		setAudioSampleRate();
+		setDepthResolution();
+		setInfraredResolution();
+		setVideoResolution();
+	}
+
+	DeviceOptions& DeviceOptions::enableAudio( bool enable )
+	{
+		mEnabledAudio = enable;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::enableDepth( bool enable )
+	{
+		mEnabledDepth = enable;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::enableInfrared( bool enable )
+	{
+		mEnabledInfrared = enable;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::enableUserTracking( bool enable, bool trackSkeletons )
+	{
+		mEnabledSkeletonTracking = trackSkeletons;
+		mEnabledUserTracking = enable;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::enableVideo( bool enable )
+	{
+		mEnabledVideo = enable;
+		return *this;
+	}
+	
+	XnSampleRate DeviceOptions::getAudioSampleRate() const
+	{
+		return mAudioSampleRate;
+	}
+
+	float DeviceOptions::getDepthFrameRate() const
+	{
+		return mFrameRateDepth;
+	}
+
+	XnResolution DeviceOptions::getDepthResolution() const
+	{
+		return mDepthResolution;
+	}
+ 
+	const Vec2i& DeviceOptions::getDepthSize() const
+	{
+		return mDepthSize;
+	}
+
+	const std::string& DeviceOptions::getDeviceId() const
+	{
+		return mDeviceId;
+	}
+
+	int32_t DeviceOptions::getDeviceIndex() const
+	{
+		return mDeviceIndex;
+	}
+
+	float  DeviceOptions::getInfraredFrameRate() const
+	{
+		return mFrameRateInfrared;
+	}
+
+	XnResolution DeviceOptions::getInfraredResolution() const
+	{
+		return mInfraredResolution;
+	}
+
+	const Vec2i& DeviceOptions::getInfraredSize() const
+	{
+		return mInfraredSize;
+	}
+
+	float  DeviceOptions::getVideoFrameRate() const
+	{
+		return mFrameRateVideo;
+	}
+
+	XnResolution DeviceOptions::getVideoResolution() const
+	{
+		return mVideoResolution;
+	}
+
+	const Vec2i& DeviceOptions::getVideoSize() const
+	{
+		return mVideoSize;
+	}
+
+	bool DeviceOptions::isAudioEnabled() const
+	{
+		return mEnabledAudio;
+	}
+
+	bool DeviceOptions::isDepthEnabled() const
+	{
+		return mEnabledDepth;
+	}
+
+	bool DeviceOptions::isInfraredEnabled() const
+	{
+		return mEnabledInfrared;
+	}
+
+	bool DeviceOptions::isSkeletonTrackingEnabled() const
+	{
+		return mEnabledSkeletonTracking;
+	}
+
+	bool DeviceOptions::isUserTrackingEnabled() const
+	{
+		return mEnabledUserTracking;
+	}
+
+	bool DeviceOptions::isVideoEnabled() const
+	{
+		return mEnabledVideo;
+	}
+
+	DeviceOptions& DeviceOptions::setAudioSampleRate( XnSampleRate sampleRate )
+	{
+		mAudioSampleRate = sampleRate;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setDepthFrameRate( float frameRate )
+	{
+		mFrameRateDepth = frameRate;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setDepthResolution( const Vec2i &size )
+	{
+		mDepthSize = size;
+		mDepthResolution = XnResolution::XN_RES_CUSTOM;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setDepthResolution( XnResolution resolution )
+	{
+		mDepthResolution = resolution;
+		mDepthSize = getResolutionSize( resolution );
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setDeviceId( const string &id )
+	{
+		mDeviceId = id;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setDeviceIndex( int32_t index )
+	{
+		mDeviceIndex = index;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setInfraredFrameRate( float frameRate )
+	{
+		mFrameRateInfrared = frameRate;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setInfraredResolution( const Vec2i &size )
+	{
+		mInfraredSize = size;
+		mInfraredResolution = XnResolution::XN_RES_CUSTOM;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setInfraredResolution( XnResolution resolution )
+	{
+		mInfraredResolution = resolution;
+		mInfraredSize = getResolutionSize( resolution );
+		return *this;
+	}
+	
+	DeviceOptions& DeviceOptions::setVideoFrameRate( float frameRate )
+	{
+		mFrameRateVideo = frameRate;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setVideoResolution( const Vec2i &size )
+	{
+		mVideoSize = size;
+		mVideoResolution = XnResolution::XN_RES_CUSTOM;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setVideoResolution( XnResolution resolution )
+	{
+		mVideoResolution = resolution;
+		mVideoSize = getResolutionSize( mVideoResolution );
+		return *this;
+	}
+
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	xn::Context			Device::sContext;
-	xn::Device			Device::sDevice[ MAX_COUNT ];
-	xn::AudioGenerator	Device::sGeneratorAudio[ MAX_COUNT ];
-	xn::DepthGenerator	Device::sGeneratorDepth[ MAX_COUNT ];
-	xn::IRGenerator		Device::sGeneratorInfrared[ MAX_COUNT ];
-	xn::UserGenerator	Device::sGeneratorUser[ MAX_COUNT ];
-	xn::ImageGenerator	Device::sGeneratorVideo[ MAX_COUNT ];
-	bool				Device::sContextInit						= false;
+	Device::DeviceInfo	Device::sDevices[ MAX_COUNT ];
+	bool				Device::sContextInit	= false;
 
 	DeviceRef Device::create()
 	{
@@ -111,30 +389,28 @@ namespace Xtion
 
 		size_t i = 0;
 		for ( xn::NodeInfoList::Iterator iter = deviceNodes.Begin(); iter != deviceNodes.End(); ++iter, ++i ) {
-
 			xn::NodeInfo info = *iter;
-			status = sContext.CreateProductionTree( info, sDevice[ i ] );
+			status = sContext.CreateProductionTree( info, sDevices[ i ].mDevice );
 
-			xn::Query query;
-			query.AddNeededNode( info.GetInstanceName() );
-
-			success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH, &query, sGeneratorDepth[ i ] ) );
-			//success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IR, &query, sGeneratorInfrared[ i ] ) );
-			success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE, &query, sGeneratorVideo[ i ] ) );
-			//success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO, &query, sGeneratorAudio[ i ] ) );
-			// TODO more nodes, ie user, etc
-
-			/*XnWaveOutputMode waveMode;
-			waveMode.nSampleRate	= 44100;
-			waveMode.nChannels		= 2;
-			waveMode.nBitsPerSample	= 16;
-			status = sGeneratorAudio[ i ].SetWaveOutputMode( waveMode );*/
-
+			sDevices[ i ].mQuery.AddNeededNode( info.GetInstanceName() );
 		}
 		sContextInit = true;
 	}
 
-	void Device::setConfigFile( const fs::path &configFilePath )
+	void Device::release()
+	{
+		for ( size_t i = 0; i < MAX_COUNT; ++i ) {
+			sDevices[ i ].mGeneratorAudio.Release();
+			sDevices[ i ].mGeneratorDepth.Release();
+			sDevices[ i ].mGeneratorInfrared.Release();
+			sDevices[ i ].mGeneratorUser.Release();
+			sDevices[ i ].mGeneratorVideo.Release();
+			sDevices[ i ].mDevice.Release();
+		}
+		sContext.Release();
+	}
+
+	/*void Device::setConfigFile( const fs::path &configFilePath )
 	{
 		sContextInit = false;
 
@@ -155,7 +431,7 @@ namespace Xtion
 		if ( success( status ) ) {
 			sContextInit = true;
 		}
-	}
+	}*/
 	
 	Device::Device()
 	{
@@ -167,14 +443,7 @@ namespace Xtion
 		if ( mCapture ) {
 			stop();
 		}
-		mContext.Release();
-		mGeneratorAudio.Release();
-		mGeneratorDepth.Release();
-		mGeneratorInfrared.Release();
-		mGeneratorUser.Release();
-		mGeneratorVideo.Release();
-		mPlayer.Release();
-
+		
 		try {
 			mMetaDataAudio.Free();
 			mMetaDataDepth.Free();
@@ -324,12 +593,7 @@ namespace Xtion
 		mDataInfrared				= 0;
 		mDataUserImage				= 0;
 		mDataVideo					= 0;
-		mEnabledAudio				= false;
-		mEnabledDepth				= false;
-		mEnabledInfrared			= false;
 		mEnabledSkeletonTracking	= false;
-		mEnabledUserTracking		= false;
-		mEnabledVideo				= false;
 		mGreyScale					= false;
 		mInverted					= false;
 		mNewDepthFrame				= false;
@@ -365,15 +629,16 @@ namespace Xtion
 
 	void Device::onCalibrationEnd( xn::SkeletonCapability &capability, XnUserID id, XnBool success )
 	{
+		int32_t index = mDeviceOptions.getDeviceIndex();
 		if ( success ) {
 			trace( "Calibration successful for user ID: " + toString( id ) );
-			mGeneratorUser.GetSkeletonCap().StartTracking( id );
+			sDevices[ index ].mGeneratorUser.GetSkeletonCap().StartTracking( id );
 		} else {
 			trace( "Calibration failed for user ID: " + toString( id ) );
 			if ( mCalibrationPoseRequired ) {
-				mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
+				sDevices[ index ].mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
 			} else {
-				mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
+				sDevices[ index ].mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
 			}
 		}
 	}
@@ -389,10 +654,11 @@ namespace Xtion
 	void Device::onNewUser( xn::UserGenerator &generator, XnUserID id )
 	{
 		trace( "New user ID: " + toString( id ) );
+		int32_t index = mDeviceOptions.getDeviceIndex();
 		if ( mCalibrationPoseRequired ) {
-			mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
+			sDevices[ index ].mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
 		} else {
-			mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
+			sDevices[ index ].mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
 		}
 	}
 
@@ -407,8 +673,9 @@ namespace Xtion
 	void Device::onPoseDetected( xn::PoseDetectionCapability &capability, const XnChar *pose, XnUserID id )
 	{
 		trace( "Pose detected for user ID: " + toString( id ) );
-		mGeneratorUser.GetPoseDetectionCap().StopPoseDetection( id );
-		mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
+		int32_t index = mDeviceOptions.getDeviceIndex();
+		sDevices[ index ].mGeneratorUser.GetPoseDetectionCap().StopPoseDetection( id );
+		sDevices[ index ].mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
 	}
 
 	void Device::pause()
@@ -426,13 +693,30 @@ namespace Xtion
 		while ( mRunning ) {
 			if ( mCapture && !mPaused ) {
 
-				XnStatus status = mContext.WaitOneUpdateAll( mGeneratorDepth );
+				int32_t index = mDeviceOptions.getDeviceIndex();
+
+				bool enabledAudio = mDeviceOptions.isAudioEnabled();
+				bool enabledDepth = mDeviceOptions.isDepthEnabled();
+				bool enabledInfrared = mDeviceOptions.isInfraredEnabled();
+				bool enabledVideo = mDeviceOptions.isVideoEnabled();
+
+				XnStatus status = XN_STATUS_OK;
+				if ( enabledDepth ) {
+					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorDepth );
+				} else if ( enabledVideo ) {
+					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorVideo );
+				} else if ( enabledInfrared ) {
+					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorInfrared );
+				} else if ( enabledAudio ) {
+					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorAudio );
+				}
+
 				if ( success( status ) ) {
 					
-					if ( mEnabledAudio ) {
-						mGeneratorAudio.GetMetaData( mMetaDataAudio );
-						const uint_fast8_t* buffer = mGeneratorAudio.GetAudioBuffer();
-						mDataAudioSize = mGeneratorAudio.GetDataSize();
+					if ( enabledAudio ) {
+						sDevices[ index ].mGeneratorAudio.GetMetaData( mMetaDataAudio );
+						const uint_fast8_t* buffer = sDevices[ index ].mGeneratorAudio.GetAudioBuffer();
+						mDataAudioSize = sDevices[ index ].mGeneratorAudio.GetDataSize();
 						if ( mDataAudio == 0 ) {
 							mDataAudio = new uint_fast8_t[ mDataAudioSize * 2 ]; // 2 = channels
 						}
@@ -440,8 +724,8 @@ namespace Xtion
 						mNewAudio = true;
 					}
 
-					if ( mEnabledDepth ) {
-						mGeneratorDepth.GetMetaData( mMetaDataDepth );
+					if ( enabledDepth ) {
+						sDevices[ index ].mGeneratorDepth.GetMetaData( mMetaDataDepth );
 						mSizeDepth = Vec2i( mMetaDataDepth.XRes(), mMetaDataDepth.YRes() );
 						uint32_t count = mSizeDepth.x * mSizeDepth.y;
 						mDataDepth = (uint16_t*)mMetaDataDepth.Data();
@@ -452,8 +736,8 @@ namespace Xtion
 						mNewDepthFrame = true;
 					}
 
-					if ( mEnabledInfrared ) {
-						mGeneratorInfrared.GetMetaData( mMetaDataInfrared );
+					if ( enabledInfrared ) {
+						sDevices[ index ].mGeneratorInfrared.GetMetaData( mMetaDataInfrared );
 						mSizeInfrared = Vec2i( mMetaDataInfrared.XRes(), mMetaDataInfrared.YRes() );
 						uint32_t count = mSizeInfrared.x * mSizeInfrared.y;
 						mDataInfrared = (uint16_t*)mMetaDataInfrared.Data();
@@ -464,20 +748,8 @@ namespace Xtion
 						mNewInfraredFrame = true;
 					}
 
-					if ( mEnabledUserTracking && mGeneratorUser.IsNewDataAvailable() ) {
-						mGeneratorUser.GetUserPixels( 0, mMetaDataScene );
-						mSizeUserImage = Vec2i( mMetaDataScene.XRes(), mMetaDataScene.YRes() );
-						uint32_t count = mSizeUserImage.x * mSizeUserImage.y;
-						mDataUserImage = (uint16_t*)mMetaDataScene.Data();
-						if ( !mChannelUserImage ) {
-							mChannelUserImage = Channel16u( mSizeInfrared.x, mSizeInfrared.y );
-						}
-						memcpy( mChannelUserImage.getData(), mDataUserImage, count * mMetaDataScene.BytesPerPixel() );
-						mNewUserData = true;
-					}
-
-					if ( mEnabledVideo ) {
-						mGeneratorVideo.GetMetaData( mMetaDataVideo );
+					if ( enabledVideo ) {
+						sDevices[ index ].mGeneratorVideo.GetMetaData( mMetaDataVideo );
 						mSizeVideo = Vec2i( mMetaDataVideo.XRes(), mMetaDataVideo.YRes() );
 						uint32_t count = mSizeVideo.x * mSizeVideo.y;
 						mDataVideo = (uint8_t*)mMetaDataVideo.Data();
@@ -492,8 +764,10 @@ namespace Xtion
 		}
 	}
 
-	void Device::start( size_t deviceIndex )
+	void Device::start( const DeviceOptions &deviceOptions )
 	{
+		mDeviceOptions = deviceOptions;
+
 		if ( mCapture ) {
 			stop();
 		}
@@ -505,26 +779,73 @@ namespace Xtion
 			return;
 		}
 
-		size_t index		= math<size_t>::min( deviceIndex, MAX_COUNT );
+		size_t index = math<size_t>::min( (size_t)mDeviceOptions.getDeviceIndex(), MAX_COUNT );
+		mDeviceOptions.setDeviceIndex( (int32_t)index );
 		
-		mContext			= sContext;
-		if ( sDevice[ index ].IsValid() != TRUE ) {
+		if ( sDevices[ index ].mDevice.IsValid() != TRUE ) {
 			return;
 		}
-		mDevice				= sDevice[ index ];
-		mGeneratorAudio		= sGeneratorAudio[ index ];
-		mGeneratorDepth		= sGeneratorDepth[ index ];
-		mGeneratorInfrared	= sGeneratorInfrared[ index ];
-		mGeneratorUser		= sGeneratorUser[ index ];
-		mGeneratorVideo		= sGeneratorVideo[ index ];
+		
+		if ( mDeviceOptions.isAudioEnabled() ) {
+			if ( success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO,	&sDevices[ index ].mQuery, sDevices[ index ].mGeneratorAudio ) ) && 
+				success( sDevices[ index ].mGeneratorAudio.IsValid() ) ) {
+				XnWaveOutputMode waveMode;
+				// TODO use settings from device options
+				waveMode.nSampleRate	= 44100;
+				waveMode.nChannels		= 2;
+				waveMode.nBitsPerSample	= 16;
+				if ( !success( sDevices[ index ].mGeneratorAudio.SetWaveOutputMode( waveMode ) ) || 
+					!success( sDevices[ index ].mGeneratorVideo.StartGenerating() ) ) {
+						mDeviceOptions.enableAudio( false );
+				}
+			} else {
+				mDeviceOptions.enableAudio( false );
+			}
+		}
 
-		mEnabledAudio			= mGeneratorAudio.IsValid() == TRUE;
-		mEnabledDepth			= mGeneratorDepth.IsValid() == TRUE;
-		mEnabledInfrared		= mGeneratorInfrared.IsValid() == TRUE;
-		mEnabledUserTracking	= mGeneratorUser.IsValid() == TRUE;
-		mEnabledVideo			= mGeneratorVideo.IsValid() == TRUE;
+		if ( mDeviceOptions.isDepthEnabled() ) {
+			//xn::Query query = sDevices[ index ].mQuery;
+			XnMapOutputMode mode;
+			mode.nFPS	= (XnUInt32)mDeviceOptions.getDepthFrameRate();
+			mode.nXRes  = (XnUInt32)mDeviceOptions.getDepthSize().x;
+			mode.nXRes	= (XnUInt32)mDeviceOptions.getDepthSize().x;
+			//query.AddSupportedMapOutputMode( mode );
+			if ( !success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH, &sDevices[ index ].mQuery, sDevices[ index ].mGeneratorDepth ) ) || 
+				!success( sDevices[ index ].mGeneratorDepth.IsValid() ) || 
+				!success( sDevices[ index ].mGeneratorDepth.StartGenerating() ) ) {
+				mDeviceOptions.enableDepth( false );
+			}
+		}
 
-		mContext.StartGeneratingAll();
+		if ( mDeviceOptions.isInfraredEnabled() ) {
+			//xn::Query query = sDevices[ index ].mQuery;
+			XnMapOutputMode mode;
+			mode.nFPS	= (XnUInt32)mDeviceOptions.getInfraredFrameRate();
+			mode.nXRes  = (XnUInt32)mDeviceOptions.getInfraredSize().x;
+			mode.nXRes	= (XnUInt32)mDeviceOptions.getInfraredSize().x;
+			//query.AddSupportedMapOutputMode( mode );
+			if ( !success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IR, &sDevices[ index ].mQuery, sDevices[ index ].mGeneratorInfrared ) ) || 
+				!success( sDevices[ index ].mGeneratorInfrared.IsValid() ) || 
+				!success( sDevices[ index ].mGeneratorInfrared.StartGenerating() ) ) {
+				mDeviceOptions.enableInfrared( false );
+			}
+		}
+
+		if ( mDeviceOptions.isVideoEnabled() ) {
+			//xn::Query query = sDevices[ index ].mQuery;
+			XnMapOutputMode mode;
+			mode.nFPS	= (XnUInt32)mDeviceOptions.getVideoFrameRate();
+			mode.nXRes  = (XnUInt32)mDeviceOptions.getVideoSize().x;
+			mode.nXRes	= (XnUInt32)mDeviceOptions.getVideoSize().x;
+			//query.AddSupportedMapOutputMode( mode );
+			if ( !success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE, &sDevices[ index ].mQuery, sDevices[ index ].mGeneratorVideo ) ) || 
+				!success( sDevices[ index ].mGeneratorVideo.IsValid() ) || 
+				!success( sDevices[ index ].mGeneratorVideo.StartGenerating() ) ) {
+				mDeviceOptions.enableVideo( false );
+			}
+		}
+
+		// TODO user nodes, hands, etc
 
 		mCapture	= true;
 		mRunning	= true;
@@ -533,7 +854,9 @@ namespace Xtion
 
 	void Device::stop()
 	{
-		mContext.StopGeneratingAll();
+		if ( mDeviceOptions.isDepthEnabled() ) {
+			sDevices[ mDeviceOptions.getDeviceIndex() ].mGeneratorDepth.StopGenerating();
+		}
 
 		mRunning = false;
 		if ( mThread ) {

@@ -48,9 +48,8 @@
 namespace Xtion
 {
 
-	typedef std::shared_ptr<class Device>	DeviceRef;
-	typedef XnSkeletonJoint					JointName;
-	typedef std::map<JointName, class Bone>	Skeleton;
+	typedef std::shared_ptr<class Device>			DeviceRef;
+	typedef std::map<XnSkeletonJoint, class Bone>	Skeleton;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,12 +64,83 @@ namespace Xtion
 	public:
 		const ci::Vec3f&				getPosition() const;
 	private:
-		Bone( JointName jointName, const ci::Vec3f &position );
+		Bone( XnSkeletonJoint jointName, const ci::Vec3f &position );
 		
-		JointName						mJointName;
+		XnSkeletonJoint					mJointName;
 		ci::Vec3f						mPosition;
 
 		friend class					Device;
+	};
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	class DeviceOptions
+	{
+	public:
+		DeviceOptions();
+
+		static ci::Vec2i	getResolutionSize( XnResolution resolution );
+
+		DeviceOptions&		enableAudio( bool enable = true );
+		DeviceOptions&		enableDepth( bool enable = true );
+		DeviceOptions&		enableInfrared( bool enable = true );
+		DeviceOptions&		enableUserTracking( bool enable = true, bool trackSkeletons = true );
+		DeviceOptions&		enableVideo( bool enable = true );
+		
+		XnSampleRate		getAudioSampleRate() const;
+		float				getDepthFrameRate() const;
+		XnResolution		getDepthResolution() const; 
+		const ci::Vec2i&	getDepthSize() const; 
+		const std::string&	getDeviceId() const;
+		int32_t				getDeviceIndex() const;
+		float				getInfraredFrameRate() const;
+		XnResolution		getInfraredResolution() const; 
+		const ci::Vec2i&	getInfraredSize() const;
+		float				getVideoFrameRate() const;
+		XnResolution		getVideoResolution() const; 
+		const ci::Vec2i&	getVideoSize() const; 
+
+		bool				isAudioEnabled() const;
+		bool				isDepthEnabled() const;
+		bool				isInfraredEnabled() const; 
+		bool				isSkeletonTrackingEnabled() const;
+		bool				isUserTrackingEnabled() const;
+		bool				isVideoEnabled() const;
+
+		DeviceOptions&		setAudioSampleRate( XnSampleRate sampleRate = XnSampleRate::XN_SAMPLE_RATE_44K ); 
+		DeviceOptions&		setDepthFrameRate( float frameRate = 30.0f ); 
+		DeviceOptions&		setDepthResolution( const ci::Vec2i &size );
+		DeviceOptions&		setDepthResolution( XnResolution resolution = XnResolution::XN_RES_QVGA ); 
+		DeviceOptions&		setDeviceId( const std::string &id = "" ); 
+		DeviceOptions&		setDeviceIndex( int32_t index = 0 ); 
+		DeviceOptions&		setInfraredResolution( const ci::Vec2i &size );
+		DeviceOptions&		setInfraredResolution( XnResolution resolution = XnResolution::XN_RES_QVGA ); 
+		DeviceOptions&		setInfraredFrameRate( float frameRate = 30.0f ); 
+		DeviceOptions&		setVideoResolution( const ci::Vec2i &size );
+		DeviceOptions&		setVideoResolution( XnResolution resolution = XnResolution::XN_RES_VGA ); 
+		DeviceOptions&		setVideoFrameRate( float frameRate = 30.0f ); 
+	private:
+		bool				mEnabledAudio;
+		bool				mEnabledDepth;
+		bool				mEnabledInfrared;
+		bool				mEnabledSkeletonTracking;
+		bool				mEnabledUserTracking;
+		bool				mEnabledVideo;
+
+		float				mFrameRateDepth;
+		float				mFrameRateInfrared;
+		float				mFrameRateVideo;
+
+		XnSampleRate		mAudioSampleRate;
+		XnResolution		mDepthResolution;
+		ci::Vec2i			mDepthSize;
+		XnResolution		mInfraredResolution;
+		ci::Vec2i			mInfraredSize;
+		XnResolution		mVideoResolution;
+		ci::Vec2i			mVideoSize;
+
+		std::string			mDeviceId;
+		int32_t				mDeviceIndex;
 	};
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,16 +149,18 @@ namespace Xtion
 	{
 	public:
 		static DeviceRef				create();
+		static void						release();
 		~Device();
-
-		static void						setConfigFile( const ci::fs::path &configFilePath );
 
 		bool							isCapturing() const;
 		bool							isPaused() const;
 		void							pause();
 		void							resume();
-		void							start( size_t deviceIndex = 0 );
+		void							start( const DeviceOptions &deviceOptions = DeviceOptions() );
+		void							start( const ci::fs::path &configFilePath );
 		void							stop();
+
+		const DeviceOptions&			getDeviceOptions() const;
 
 		void							enableBinaryMode( bool enable = true, bool invertImage = false );
 		bool							isBinaryImageInverted() const;
@@ -134,20 +206,22 @@ namespace Xtion
 		static bool						sContextInit;
 		static xn::Context				sContext;
 
-		static xn::Device				sDevice[ MAX_COUNT ];
-
-		static xn::AudioGenerator		sGeneratorAudio[ MAX_COUNT ];
-		static xn::DepthGenerator		sGeneratorDepth[ MAX_COUNT ];
-		static xn::IRGenerator			sGeneratorInfrared[ MAX_COUNT ];
-		static xn::UserGenerator		sGeneratorUser[ MAX_COUNT ];
-		static xn::ImageGenerator		sGeneratorVideo[ MAX_COUNT ];
+		struct DeviceInfo
+		{
+			xn::Device					mDevice;
+			xn::AudioGenerator			mGeneratorAudio;
+			xn::DepthGenerator			mGeneratorDepth;
+			xn::IRGenerator				mGeneratorInfrared;
+			xn::UserGenerator			mGeneratorUser;
+			xn::ImageGenerator			mGeneratorVideo;
+			xn::Query					mQuery;
+		};
+		static DeviceInfo				sDevices[ MAX_COUNT ];
 
 		void							init();
 
-		xn::Context						mContext;
 		xn::Query						mQuery;
 		
-		xn::Player						mPlayer;
 		bool							mEnabledSkeletonTracking;
 		
 		XnCallbackHandle				mCallbackCalibration;
@@ -179,25 +253,13 @@ namespace Xtion
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
-		xn::Device						mDevice;
-
-		xn::AudioGenerator				mGeneratorAudio;
-		xn::DepthGenerator				mGeneratorDepth;
-		xn::IRGenerator					mGeneratorInfrared;
-		xn::UserGenerator				mGeneratorUser;
-		xn::ImageGenerator				mGeneratorVideo;
+		DeviceOptions					mDeviceOptions;
 
 		xn::AudioMetaData				mMetaDataAudio;
 		xn::DepthMetaData				mMetaDataDepth;
 		xn::IRMetaData					mMetaDataInfrared;
 		xn::SceneMetaData				mMetaDataScene;
 		xn::ImageMetaData				mMetaDataVideo;
-
-		bool							mEnabledAudio;
-		bool							mEnabledDepth;
-		bool							mEnabledInfrared;
-		bool							mEnabledUserTracking;
-		bool							mEnabledVideo;
 
 		volatile bool					mRunning;
 		ThreadRef						mThread;
