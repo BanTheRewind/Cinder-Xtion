@@ -88,8 +88,51 @@ namespace Xtion
 	xn::IRGenerator		Device::sGeneratorInfrared[ MAX_COUNT ];
 	xn::UserGenerator	Device::sGeneratorUser[ MAX_COUNT ];
 	xn::ImageGenerator	Device::sGeneratorVideo[ MAX_COUNT ];
-	xn::Context			Device::sContextFile;
 	bool				Device::sContextInit						= false;
+
+	DeviceRef Device::create()
+	{
+		if ( !sContextInit ) {
+			initContext();
+		}
+		return DeviceRef( new Device() );
+	}
+
+	void Device::initContext() 
+	{
+		XnStatus status = sContext.Init();
+		if ( !success( status ) ) {
+			return;
+		}
+
+		xn::NodeInfoList deviceNodes;
+		size_t count = 0;
+		status = sContext.EnumerateProductionTrees( XN_NODE_TYPE_DEVICE, 0, deviceNodes );
+
+		size_t i = 0;
+		for ( xn::NodeInfoList::Iterator iter = deviceNodes.Begin(); iter != deviceNodes.End(); ++iter, ++i ) {
+
+			xn::NodeInfo info = *iter;
+			status = sContext.CreateProductionTree( info, sDevice[ i ] );
+
+			xn::Query query;
+			query.AddNeededNode( info.GetInstanceName() );
+
+			success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH, &query, sGeneratorDepth[ i ] ) );
+			//success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IR, &query, sGeneratorInfrared[ i ] ) );
+			success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE, &query, sGeneratorVideo[ i ] ) );
+			//success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO, &query, sGeneratorAudio[ i ] ) );
+			// TODO more nodes, ie user, etc
+
+			/*XnWaveOutputMode waveMode;
+			waveMode.nSampleRate	= 44100;
+			waveMode.nChannels		= 2;
+			waveMode.nBitsPerSample	= 16;
+			status = sGeneratorAudio[ i ].SetWaveOutputMode( waveMode );*/
+
+		}
+		sContextInit = true;
+	}
 
 	void Device::setConfigFile( const fs::path &configFilePath )
 	{
@@ -103,50 +146,17 @@ namespace Xtion
 		}
 
 		xn::ScriptNode scriptNode;
-		status = sContext.Init();//FromXmlFile( filePath.c_str(), scriptNode, 0 );
+		status = sContext.InitFromXmlFile( filePath.c_str(), scriptNode, 0 );
 		if ( status == XN_STATUS_NO_NODE_PRESENT ) {
 			trace( "Invalid configuration file" );
 			return;
 		}
+		scriptNode.Release();
 		if ( success( status ) ) {
-			
-			xn::NodeInfoList deviceNodes;
-			size_t count = 0;
-			status = sContext.EnumerateProductionTrees( XN_NODE_TYPE_DEVICE, 0, deviceNodes );
-
-			size_t i = 0;
-			for ( xn::NodeInfoList::Iterator iter = deviceNodes.Begin(); iter != deviceNodes.End(); ++iter, ++i ) {
-			   
-				xn::NodeInfo info = *iter;
-				status = sContext.CreateProductionTree( info, sDevice[ i ] );
-
-				xn::Query query;
-				query.AddNeededNode( info.GetInstanceName() );
-
-				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH, &query, sGeneratorDepth[ i ] ) );
-				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IR, &query, sGeneratorInfrared[ i ] ) );
-				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE, &query, sGeneratorVideo[ i ] ) );
-				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO, &query, sGeneratorAudio[ i ] ) );
-				
-				XnWaveOutputMode waveMode;
-				waveMode.nSampleRate	= 44100;
-				waveMode.nChannels		= 2;
-				waveMode.nBitsPerSample	= 16;
-				status = sGeneratorAudio[ i ].SetWaveOutputMode( waveMode );
-
-			}
-
-		   scriptNode.Release();
-
+			sContextInit = true;
 		}
-		sContextInit = true;
 	}
-
-	DeviceRef Device::create()
-	{
-		return DeviceRef( new Device() );
-	}
-
+	
 	Device::Device()
 	{
 		init();
@@ -514,7 +524,7 @@ namespace Xtion
 		mEnabledUserTracking	= mGeneratorUser.IsValid() == TRUE;
 		mEnabledVideo			= mGeneratorVideo.IsValid() == TRUE;
 
-		//mContext.StartGeneratingAll();
+		mContext.StartGeneratingAll();
 
 		mCapture	= true;
 		mRunning	= true;

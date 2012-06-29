@@ -128,11 +128,10 @@ namespace Xtion
 		
 		Device();
 
-		static xn::Context				sContextFile;
-		static bool						sContextInit;
-
 		static const uint32_t MAX_COUNT	= 6;
 
+		static void						initContext();
+		static bool						sContextInit;
 		static xn::Context				sContext;
 
 		static xn::Device				sDevice[ MAX_COUNT ];
