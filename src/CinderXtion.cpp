@@ -45,7 +45,7 @@ namespace Xtion
 	using namespace ci;
 	using namespace ci::app;
 	using namespace std;
-
+	
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	bool success( XnStatus status ) 
@@ -81,6 +81,67 @@ namespace Xtion
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
+	xn::Context			Device::sContext;
+	xn::Device			Device::sDevice[ MAX_COUNT ];
+	xn::AudioGenerator	Device::sGeneratorAudio[ MAX_COUNT ];
+	xn::DepthGenerator	Device::sGeneratorDepth[ MAX_COUNT ];
+	xn::IRGenerator		Device::sGeneratorInfrared[ MAX_COUNT ];
+	xn::UserGenerator	Device::sGeneratorUser[ MAX_COUNT ];
+	xn::ImageGenerator	Device::sGeneratorVideo[ MAX_COUNT ];
+	xn::Context			Device::sContextFile;
+	bool				Device::sContextInit						= false;
+
+	void Device::setConfigFile( const fs::path &configFilePath )
+	{
+		sContextInit = false;
+
+		XnStatus status = XN_STATUS_OK;
+		const std::string& filePath = configFilePath.generic_string();
+		if ( !fs::exists( configFilePath ) ) {
+			trace( "\"" + filePath + "\" does not exist" );
+			return;
+		}
+
+		xn::ScriptNode scriptNode;
+		status = sContext.Init();//FromXmlFile( filePath.c_str(), scriptNode, 0 );
+		if ( status == XN_STATUS_NO_NODE_PRESENT ) {
+			trace( "Invalid configuration file" );
+			return;
+		}
+		if ( success( status ) ) {
+			
+			xn::NodeInfoList deviceNodes;
+			size_t count = 0;
+			status = sContext.EnumerateProductionTrees( XN_NODE_TYPE_DEVICE, 0, deviceNodes );
+
+			size_t i = 0;
+			for ( xn::NodeInfoList::Iterator iter = deviceNodes.Begin(); iter != deviceNodes.End(); ++iter, ++i ) {
+			   
+				xn::NodeInfo info = *iter;
+				status = sContext.CreateProductionTree( info, sDevice[ i ] );
+
+				xn::Query query;
+				query.AddNeededNode( info.GetInstanceName() );
+
+				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH, &query, sGeneratorDepth[ i ] ) );
+				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IR, &query, sGeneratorInfrared[ i ] ) );
+				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE, &query, sGeneratorVideo[ i ] ) );
+				success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO, &query, sGeneratorAudio[ i ] ) );
+				
+				XnWaveOutputMode waveMode;
+				waveMode.nSampleRate	= 44100;
+				waveMode.nChannels		= 2;
+				waveMode.nBitsPerSample	= 16;
+				status = sGeneratorAudio[ i ].SetWaveOutputMode( waveMode );
+
+			}
+
+		   scriptNode.Release();
+
+		}
+		sContextInit = true;
+	}
+
 	DeviceRef Device::create()
 	{
 		return DeviceRef( new Device() );
@@ -103,7 +164,6 @@ namespace Xtion
 		mGeneratorUser.Release();
 		mGeneratorVideo.Release();
 		mPlayer.Release();
-		mScriptNode.Release();
 
 		try {
 			mMetaDataAudio.Free();
@@ -246,6 +306,7 @@ namespace Xtion
 	{
 		mDataAudio					= 0;
 		mDataAudioSize				= 0;
+		mDeviceCount				= 0;
 		mBinary						= false;
 		mCalibrationPoseRequired	= true;
 		mCapture					= false;
@@ -355,8 +416,7 @@ namespace Xtion
 		while ( mRunning ) {
 			if ( mCapture && !mPaused ) {
 
-				mContext.StartGeneratingAll();
-				XnStatus status = mContext.WaitAnyUpdateAll();
+				XnStatus status = mContext.WaitOneUpdateAll( mGeneratorDepth );
 				if ( success( status ) ) {
 					
 					if ( mEnabledAudio ) {
@@ -419,100 +479,43 @@ namespace Xtion
 					}
 				}
 			}
-			Sleep( 7 );
 		}
 	}
 
-	void Device::start( const fs::path &configFilePath )
+	void Device::start( size_t deviceIndex )
 	{
 		if ( mCapture ) {
 			stop();
 		}
-		
+
 		XnStatus status = XN_STATUS_OK;
-		const std::string& filePath = configFilePath.generic_string();
-		if ( !fs::exists( configFilePath ) ) {
-			trace( "\"" + filePath + "\" does not exist" );
-			return;
-		}
-		status = mContext.InitFromXmlFile( filePath.c_str(), mScriptNode, 0 );
-		if ( status == XN_STATUS_NO_NODE_PRESENT ) {
-			trace( "Invalid configuration file" );
-			return;
-		}
-		if ( !success( status ) ) {
-			return;
-		}
-
-		status = mContext.FindExistingNode( XN_NODE_TYPE_AUDIO, mGeneratorAudio );
-		if ( success( status ) ) {
-			XnWaveOutputMode waveMode;
-			waveMode.nSampleRate	= 44100;
-			waveMode.nChannels		= 2;
-			waveMode.nBitsPerSample	= 16;
-			status = mGeneratorAudio.SetWaveOutputMode( waveMode );
-			if ( success( status ) ) {
-				mEnabledAudio = true;
-			}
-		}
-
-		status = mContext.FindExistingNode( XN_NODE_TYPE_DEPTH, mGeneratorDepth );
-		if ( success( status ) ) {
-			mEnabledDepth = true;
-		}
-
-		status = mContext.FindExistingNode( XN_NODE_TYPE_IMAGE, mGeneratorVideo );
-		if ( success( status ) ) {
-			mEnabledVideo = true;
-		}
-
-		status = mContext.FindExistingNode( XN_NODE_TYPE_IR, mGeneratorInfrared );
-		if ( success( status ) ) {
-			mEnabledInfrared = true;
-		}
-
-		status = mContext.FindExistingNode( XN_NODE_TYPE_USER, mGeneratorUser );
-		if ( success( status ) ) {
-			mEnabledUserTracking = true;
-		}
-
-		if ( mEnabledUserTracking ) {
-			if ( !mGeneratorUser.IsCapabilitySupported( XN_CAPABILITY_SKELETON ) ) {
-				trace( "User generator does not support skeleton tracking" );
-			} else {
-				status = mGeneratorUser.RegisterUserCallbacks( onNewUser, 0, 0, mCallbackUser );
-				if ( success( status ) ) {
-					status = mGeneratorUser.GetSkeletonCap().RegisterCalibrationCallbacks( 0, onCalibrationEnd, 0, mCallbackCalibration );
-					if ( success( status ) ) {
-						bool setSkeletonProfile = false;
-						mCalibrationPoseRequired = mGeneratorUser.GetSkeletonCap().NeedPoseForCalibration() == TRUE;
-						if ( mCalibrationPoseRequired ) {
-							if ( !mGeneratorUser.IsCapabilitySupported( XN_CAPABILITY_POSE_DETECTION ) ) {
-								trace( "Calibration pose required to track skeletons, but is not supported by user generator" );
-							} else {
-								status = mGeneratorUser.GetPoseDetectionCap().RegisterToPoseCallbacks( onPoseDetected, 0, 0, mCallbackPose );
-								if ( success( status ) ) {
-									status = mGeneratorUser.GetSkeletonCap().GetCalibrationPose( mPoseStr );
-									if ( success( status ) ) {
-										setSkeletonProfile = true;
-									}
-								}
-							}
-
-						} else {
-							setSkeletonProfile = true;
-						}
-						if ( setSkeletonProfile ) {
-							status = mGeneratorUser.GetSkeletonCap().SetSkeletonProfile( XN_SKEL_PROFILE_ALL );
-							if ( success( status ) ) {
-								mEnabledSkeletonTracking = true;
-							}
-						}
-					}
-				}
-			}
-		}
 		
+		if ( !sContextInit ) {
+			trace( "Configuration file not set. Please call Device::setConfigFile() before initializing a device." );
+			return;
+		}
+
+		size_t index		= math<size_t>::min( deviceIndex, MAX_COUNT );
+		
+		mContext			= sContext;
+		if ( sDevice[ index ].IsValid() != TRUE ) {
+			return;
+		}
+		mDevice				= sDevice[ index ];
+		mGeneratorAudio		= sGeneratorAudio[ index ];
+		mGeneratorDepth		= sGeneratorDepth[ index ];
+		mGeneratorInfrared	= sGeneratorInfrared[ index ];
+		mGeneratorUser		= sGeneratorUser[ index ];
+		mGeneratorVideo		= sGeneratorVideo[ index ];
+
+		mEnabledAudio			= mGeneratorAudio.IsValid() == TRUE;
+		mEnabledDepth			= mGeneratorDepth.IsValid() == TRUE;
+		mEnabledInfrared		= mGeneratorInfrared.IsValid() == TRUE;
+		mEnabledUserTracking	= mGeneratorUser.IsValid() == TRUE;
+		mEnabledVideo			= mGeneratorVideo.IsValid() == TRUE;
+
+		//mContext.StartGeneratingAll();
+
 		mCapture	= true;
 		mRunning	= true;
 		mThread		= ThreadRef( new boost::thread( bind( &Device::run, this ) ) );

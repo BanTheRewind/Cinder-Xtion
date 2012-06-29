@@ -81,11 +81,13 @@ namespace Xtion
 		static DeviceRef				create();
 		~Device();
 
+		static void						setConfigFile( const ci::fs::path &configFilePath );
+
 		bool							isCapturing() const;
 		bool							isPaused() const;
 		void							pause();
 		void							resume();
-		void							start( const ci::fs::path &configFilePath );
+		void							start( size_t deviceIndex = 0 );
 		void							stop();
 
 		void							enableBinaryMode( bool enable = true, bool invertImage = false );
@@ -119,15 +121,32 @@ namespace Xtion
 		ci::Vec2i						getSkeletonDepthPos( const ci::Vec3f &position );
 		ci::Vec2i						getSkeletonInfraredPos( const ci::Vec3f &position );
 		ci::Vec2i						getSkeletonVideoPos( const ci::Vec3f &position );
+
+		size_t							getDeviceCount() const;
 	private:
 		typedef std::shared_ptr<boost::thread>	ThreadRef;
-
+		
 		Device();
+
+		static xn::Context				sContextFile;
+		static bool						sContextInit;
+
+		static const uint32_t MAX_COUNT	= 6;
+
+		static xn::Context				sContext;
+
+		static xn::Device				sDevice[ MAX_COUNT ];
+
+		static xn::AudioGenerator		sGeneratorAudio[ MAX_COUNT ];
+		static xn::DepthGenerator		sGeneratorDepth[ MAX_COUNT ];
+		static xn::IRGenerator			sGeneratorInfrared[ MAX_COUNT ];
+		static xn::UserGenerator		sGeneratorUser[ MAX_COUNT ];
+		static xn::ImageGenerator		sGeneratorVideo[ MAX_COUNT ];
 
 		void							init();
 
 		xn::Context						mContext;
-		xn::ScriptNode					mScriptNode;
+		xn::Query						mQuery;
 		
 		xn::Player						mPlayer;
 		bool							mEnabledSkeletonTracking;
@@ -156,7 +175,12 @@ namespace Xtion
 
 		XnUInt64						mLastUpdate;
 
+		std::string						mDeviceId;
+		size_t							mDeviceCount;
+
 		//////////////////////////////////////////////////////////////////////////////////////////////
+
+		xn::Device						mDevice;
 
 		xn::AudioGenerator				mGeneratorAudio;
 		xn::DepthGenerator				mGeneratorDepth;
@@ -180,6 +204,7 @@ namespace Xtion
 		ThreadRef						mThread;
 		void							run();
 
+		boost::mutex					mMutex;
 		boost::mutex					mMutexAudio;
 		boost::mutex					mMutexDepth;
 		boost::mutex					mMutexInfrared;
