@@ -364,75 +364,11 @@ namespace Xtion
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	xn::Context			Device::sContext;
-	Device::DeviceInfo	Device::sDevices[ MAX_COUNT ];
-	bool				Device::sContextInit	= false;
-
 	DeviceRef Device::create()
 	{
-		if ( !sContextInit ) {
-			initContext();
-		}
 		return DeviceRef( new Device() );
 	}
 
-	void Device::initContext() 
-	{
-		XnStatus status = sContext.Init();
-		if ( !success( status ) ) {
-			return;
-		}
-
-		xn::NodeInfoList deviceNodes;
-		size_t count = 0;
-		status = sContext.EnumerateProductionTrees( XN_NODE_TYPE_DEVICE, 0, deviceNodes );
-
-		size_t i = 0;
-		for ( xn::NodeInfoList::Iterator iter = deviceNodes.Begin(); iter != deviceNodes.End(); ++iter, ++i ) {
-			xn::NodeInfo info = *iter;
-			status = sContext.CreateProductionTree( info, sDevices[ i ].mDevice );
-
-			sDevices[ i ].mQuery.AddNeededNode( info.GetInstanceName() );
-		}
-		sContextInit = true;
-	}
-
-	void Device::release()
-	{
-		for ( size_t i = 0; i < MAX_COUNT; ++i ) {
-			sDevices[ i ].mGeneratorAudio.Release();
-			sDevices[ i ].mGeneratorDepth.Release();
-			sDevices[ i ].mGeneratorInfrared.Release();
-			sDevices[ i ].mGeneratorUser.Release();
-			sDevices[ i ].mGeneratorVideo.Release();
-			sDevices[ i ].mDevice.Release();
-		}
-		sContext.Release();
-	}
-
-	/*void Device::setConfigFile( const fs::path &configFilePath )
-	{
-		sContextInit = false;
-
-		XnStatus status = XN_STATUS_OK;
-		const std::string& filePath = configFilePath.generic_string();
-		if ( !fs::exists( configFilePath ) ) {
-			trace( "\"" + filePath + "\" does not exist" );
-			return;
-		}
-
-		xn::ScriptNode scriptNode;
-		status = sContext.InitFromXmlFile( filePath.c_str(), scriptNode, 0 );
-		if ( status == XN_STATUS_NO_NODE_PRESENT ) {
-			trace( "Invalid configuration file" );
-			return;
-		}
-		scriptNode.Release();
-		if ( success( status ) ) {
-			sContextInit = true;
-		}
-	}*/
-	
 	Device::Device()
 	{
 		init();
@@ -443,13 +379,20 @@ namespace Xtion
 		if ( mCapture ) {
 			stop();
 		}
-		
+
 		try {
 			mMetaDataAudio.Free();
 			mMetaDataDepth.Free();
 			mMetaDataInfrared.Free();
 			mMetaDataScene.Free();
 			mMetaDataVideo.Free();
+			mGeneratorAudio.Release();
+			mGeneratorDepth.Release();
+			mGeneratorInfrared.Release();
+			mGeneratorUser.Release();
+			mGeneratorVideo.Release();
+			mDevice.Release();
+			mContext.Release();
 		} catch ( ... ) {
 		}
 
@@ -593,7 +536,6 @@ namespace Xtion
 		mDataInfrared				= 0;
 		mDataUserImage				= 0;
 		mDataVideo					= 0;
-		mEnabledSkeletonTracking	= false;
 		mGreyScale					= false;
 		mInverted					= false;
 		mNewDepthFrame				= false;
@@ -632,13 +574,13 @@ namespace Xtion
 		int32_t index = mDeviceOptions.getDeviceIndex();
 		if ( success ) {
 			trace( "Calibration successful for user ID: " + toString( id ) );
-			sDevices[ index ].mGeneratorUser.GetSkeletonCap().StartTracking( id );
+			mGeneratorUser.GetSkeletonCap().StartTracking( id );
 		} else {
 			trace( "Calibration failed for user ID: " + toString( id ) );
 			if ( mCalibrationPoseRequired ) {
-				sDevices[ index ].mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
+				mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
 			} else {
-				sDevices[ index ].mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
+				mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
 			}
 		}
 	}
@@ -656,9 +598,9 @@ namespace Xtion
 		trace( "New user ID: " + toString( id ) );
 		int32_t index = mDeviceOptions.getDeviceIndex();
 		if ( mCalibrationPoseRequired ) {
-			sDevices[ index ].mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
+			mGeneratorUser.GetPoseDetectionCap().StartPoseDetection( mPoseStr, id );
 		} else {
-			sDevices[ index ].mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
+			mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
 		}
 	}
 
@@ -674,8 +616,8 @@ namespace Xtion
 	{
 		trace( "Pose detected for user ID: " + toString( id ) );
 		int32_t index = mDeviceOptions.getDeviceIndex();
-		sDevices[ index ].mGeneratorUser.GetPoseDetectionCap().StopPoseDetection( id );
-		sDevices[ index ].mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
+		mGeneratorUser.GetPoseDetectionCap().StopPoseDetection( id );
+		mGeneratorUser.GetSkeletonCap().RequestCalibration( id, TRUE );
 	}
 
 	void Device::pause()
@@ -702,21 +644,21 @@ namespace Xtion
 
 				XnStatus status = XN_STATUS_OK;
 				if ( enabledDepth ) {
-					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorDepth );
+					XnStatus status = mContext.WaitOneUpdateAll( mGeneratorDepth );
 				} else if ( enabledVideo ) {
-					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorVideo );
+					XnStatus status = mContext.WaitOneUpdateAll( mGeneratorVideo );
 				} else if ( enabledInfrared ) {
-					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorInfrared );
+					XnStatus status = mContext.WaitOneUpdateAll( mGeneratorInfrared );
 				} else if ( enabledAudio ) {
-					XnStatus status = sContext.WaitOneUpdateAll( sDevices[ index ].mGeneratorAudio );
+					XnStatus status = mContext.WaitOneUpdateAll( mGeneratorAudio );
 				}
 
 				if ( success( status ) ) {
 					
 					if ( enabledAudio ) {
-						sDevices[ index ].mGeneratorAudio.GetMetaData( mMetaDataAudio );
-						const uint_fast8_t* buffer = sDevices[ index ].mGeneratorAudio.GetAudioBuffer();
-						mDataAudioSize = sDevices[ index ].mGeneratorAudio.GetDataSize();
+						mGeneratorAudio.GetMetaData( mMetaDataAudio );
+						const uint_fast8_t* buffer = mGeneratorAudio.GetAudioBuffer();
+						mDataAudioSize = mGeneratorAudio.GetDataSize();
 						if ( mDataAudio == 0 ) {
 							mDataAudio = new uint_fast8_t[ mDataAudioSize * 2 ]; // 2 = channels
 						}
@@ -725,7 +667,7 @@ namespace Xtion
 					}
 
 					if ( enabledDepth ) {
-						sDevices[ index ].mGeneratorDepth.GetMetaData( mMetaDataDepth );
+						mGeneratorDepth.GetMetaData( mMetaDataDepth );
 						mSizeDepth = Vec2i( mMetaDataDepth.XRes(), mMetaDataDepth.YRes() );
 						uint32_t count = mSizeDepth.x * mSizeDepth.y;
 						mDataDepth = (uint16_t*)mMetaDataDepth.Data();
@@ -737,7 +679,7 @@ namespace Xtion
 					}
 
 					if ( enabledInfrared ) {
-						sDevices[ index ].mGeneratorInfrared.GetMetaData( mMetaDataInfrared );
+						mGeneratorInfrared.GetMetaData( mMetaDataInfrared );
 						mSizeInfrared = Vec2i( mMetaDataInfrared.XRes(), mMetaDataInfrared.YRes() );
 						uint32_t count = mSizeInfrared.x * mSizeInfrared.y;
 						mDataInfrared = (uint16_t*)mMetaDataInfrared.Data();
@@ -749,7 +691,7 @@ namespace Xtion
 					}
 
 					if ( enabledVideo ) {
-						sDevices[ index ].mGeneratorVideo.GetMetaData( mMetaDataVideo );
+						mGeneratorVideo.GetMetaData( mMetaDataVideo );
 						mSizeVideo = Vec2i( mMetaDataVideo.XRes(), mMetaDataVideo.YRes() );
 						uint32_t count = mSizeVideo.x * mSizeVideo.y;
 						mDataVideo = (uint8_t*)mMetaDataVideo.Data();
@@ -774,78 +716,99 @@ namespace Xtion
 
 		XnStatus status = XN_STATUS_OK;
 		
-		if ( !sContextInit ) {
-			trace( "Configuration file not set. Please call Device::setConfigFile() before initializing a device." );
-			return;
-		}
-
 		size_t index = math<size_t>::min( (size_t)mDeviceOptions.getDeviceIndex(), MAX_COUNT );
 		mDeviceOptions.setDeviceIndex( (int32_t)index );
 		
-		if ( sDevices[ index ].mDevice.IsValid() != TRUE ) {
+		status = mContext.Init();
+		if ( !success( status ) ) {
 			return;
 		}
-		
-		if ( mDeviceOptions.isAudioEnabled() ) {
-			if ( success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO,	&sDevices[ index ].mQuery, sDevices[ index ].mGeneratorAudio ) ) && 
-				success( sDevices[ index ].mGeneratorAudio.IsValid() ) ) {
+
+		xn::NodeInfoList deviceNodes;
+		size_t count = 0;
+		status = mContext.EnumerateProductionTrees( XN_NODE_TYPE_DEVICE, 0, deviceNodes );
+
+		size_t i = 0;
+		for ( xn::NodeInfoList::Iterator iter = deviceNodes.Begin(); iter != deviceNodes.End(); ++iter, ++i ) {
+			if ( i == index ) {
+				xn::NodeInfo info = *iter;
+				status = mContext.CreateProductionTree( info, mDevice );
+				mQuery.AddNeededNode( info.GetInstanceName() );
+			}
+		}
+
+		/*if ( mDeviceOptions.isAudioEnabled() ) {
+			if ( success( mContext.CreateAnyProductionTree( XN_NODE_TYPE_AUDIO,	&mQuery, mGeneratorAudio ) ) && 
+				success( mGeneratorAudio.IsValid() ) ) {
 				XnWaveOutputMode waveMode;
 				// TODO use settings from device options
 				waveMode.nSampleRate	= 44100;
 				waveMode.nChannels		= 2;
 				waveMode.nBitsPerSample	= 16;
-				if ( !success( sDevices[ index ].mGeneratorAudio.SetWaveOutputMode( waveMode ) ) || 
-					!success( sDevices[ index ].mGeneratorVideo.StartGenerating() ) ) {
+				if ( !success( mGeneratorAudio.SetWaveOutputMode( waveMode ) ) || 
+					!success( mGeneratorVideo.StartGenerating() ) ) {
 						mDeviceOptions.enableAudio( false );
 				}
 			} else {
 				mDeviceOptions.enableAudio( false );
 			}
-		}
+		}*/
 
 		if ( mDeviceOptions.isDepthEnabled() ) {
-			//xn::Query query = sDevices[ index ].mQuery;
 			XnMapOutputMode mode;
 			mode.nFPS	= (XnUInt32)mDeviceOptions.getDepthFrameRate();
 			mode.nXRes  = (XnUInt32)mDeviceOptions.getDepthSize().x;
-			mode.nXRes	= (XnUInt32)mDeviceOptions.getDepthSize().x;
-			//query.AddSupportedMapOutputMode( mode );
-			if ( !success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH, &sDevices[ index ].mQuery, sDevices[ index ].mGeneratorDepth ) ) || 
-				!success( sDevices[ index ].mGeneratorDepth.IsValid() ) || 
-				!success( sDevices[ index ].mGeneratorDepth.StartGenerating() ) ) {
+			mode.nYRes	= (XnUInt32)mDeviceOptions.getDepthSize().y;
+			mQuery.AddSupportedMapOutputMode( mode );
+
+			status = mContext.CreateAnyProductionTree( XN_NODE_TYPE_DEPTH,  &mQuery, mGeneratorDepth );
+			if ( !success( status ) ) {
 				mDeviceOptions.enableDepth( false );
+			} else {
+				status = mGeneratorDepth.StartGenerating();
+				if ( !success( status ) ) {
+					mDeviceOptions.enableDepth( false );
+				}
 			}
 		}
 
 		if ( mDeviceOptions.isInfraredEnabled() ) {
-			//xn::Query query = sDevices[ index ].mQuery;
 			XnMapOutputMode mode;
 			mode.nFPS	= (XnUInt32)mDeviceOptions.getInfraredFrameRate();
 			mode.nXRes  = (XnUInt32)mDeviceOptions.getInfraredSize().x;
-			mode.nXRes	= (XnUInt32)mDeviceOptions.getInfraredSize().x;
-			//query.AddSupportedMapOutputMode( mode );
-			if ( !success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IR, &sDevices[ index ].mQuery, sDevices[ index ].mGeneratorInfrared ) ) || 
-				!success( sDevices[ index ].mGeneratorInfrared.IsValid() ) || 
-				!success( sDevices[ index ].mGeneratorInfrared.StartGenerating() ) ) {
+			mode.nYRes	= (XnUInt32)mDeviceOptions.getInfraredSize().y;
+			mQuery.AddSupportedMapOutputMode( mode );
+
+			status = mContext.CreateAnyProductionTree( XN_NODE_TYPE_IR,  &mQuery, mGeneratorInfrared );
+			if ( !success( status ) ) {
 				mDeviceOptions.enableInfrared( false );
+			} else {
+				status = mGeneratorInfrared.StartGenerating();
+				if ( !success( status ) ) {
+					mDeviceOptions.enableInfrared( false );
+				}
 			}
 		}
 
 		if ( mDeviceOptions.isVideoEnabled() ) {
-			//xn::Query query = sDevices[ index ].mQuery;
 			XnMapOutputMode mode;
 			mode.nFPS	= (XnUInt32)mDeviceOptions.getVideoFrameRate();
 			mode.nXRes  = (XnUInt32)mDeviceOptions.getVideoSize().x;
-			mode.nXRes	= (XnUInt32)mDeviceOptions.getVideoSize().x;
-			//query.AddSupportedMapOutputMode( mode );
-			if ( !success( sContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE, &sDevices[ index ].mQuery, sDevices[ index ].mGeneratorVideo ) ) || 
-				!success( sDevices[ index ].mGeneratorVideo.IsValid() ) || 
-				!success( sDevices[ index ].mGeneratorVideo.StartGenerating() ) ) {
+			mode.nYRes	= (XnUInt32)mDeviceOptions.getVideoSize().y;
+			mQuery.AddSupportedMapOutputMode( mode );
+
+			status = mContext.CreateAnyProductionTree( XN_NODE_TYPE_IMAGE,  &mQuery, mGeneratorVideo );
+			if ( !success( status ) ) {
 				mDeviceOptions.enableVideo( false );
+			} else {
+				status = mGeneratorVideo.StartGenerating();
+				if ( !success( status ) ) {
+					mDeviceOptions.enableVideo( false );
+				}
 			}
 		}
 
-		// TODO user nodes, hands, etc
+		// TODO more production nodes... users, hands, etc
 
 		mCapture	= true;
 		mRunning	= true;
@@ -854,8 +817,20 @@ namespace Xtion
 
 	void Device::stop()
 	{
+		if ( mDeviceOptions.isAudioEnabled() ) {
+			mGeneratorAudio.StopGenerating();
+		}
 		if ( mDeviceOptions.isDepthEnabled() ) {
-			sDevices[ mDeviceOptions.getDeviceIndex() ].mGeneratorDepth.StopGenerating();
+			mGeneratorDepth.StopGenerating();
+		}
+		if ( mDeviceOptions.isInfraredEnabled() ) {
+			mGeneratorInfrared.StopGenerating();
+		}
+		if ( mDeviceOptions.isUserTrackingEnabled() ) {
+			mGeneratorUser.StopGenerating();
+		}
+		if ( mDeviceOptions.isVideoEnabled() ) {
+			mGeneratorVideo.StopGenerating();
 		}
 
 		mRunning = false;

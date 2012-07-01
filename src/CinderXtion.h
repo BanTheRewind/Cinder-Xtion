@@ -202,28 +202,8 @@ namespace Xtion
 
 		static const uint32_t MAX_COUNT	= 6;
 
-		static void						initContext();
-		static bool						sContextInit;
-		static xn::Context				sContext;
-
-		struct DeviceInfo
-		{
-			xn::Device					mDevice;
-			xn::AudioGenerator			mGeneratorAudio;
-			xn::DepthGenerator			mGeneratorDepth;
-			xn::IRGenerator				mGeneratorInfrared;
-			xn::UserGenerator			mGeneratorUser;
-			xn::ImageGenerator			mGeneratorVideo;
-			xn::Query					mQuery;
-		};
-		static DeviceInfo				sDevices[ MAX_COUNT ];
-
 		void							init();
 
-		xn::Query						mQuery;
-		
-		bool							mEnabledSkeletonTracking;
-		
 		XnCallbackHandle				mCallbackCalibration;
 		XnCallbackHandle				mCallbackPose;
 		XnCallbackHandle				mCallbackUser;
@@ -255,6 +235,10 @@ namespace Xtion
 
 		DeviceOptions					mDeviceOptions;
 
+		xn::Context						mContext;
+		xn::Device						mDevice;
+		xn::Query						mQuery;
+
 		xn::AudioMetaData				mMetaDataAudio;
 		xn::DepthMetaData				mMetaDataDepth;
 		xn::IRMetaData					mMetaDataInfrared;
@@ -282,6 +266,12 @@ namespace Xtion
 		uint16_t						*mDataInfrared;
 		uint16_t						*mDataUserImage;
 		uint8_t							*mDataVideo;
+
+		xn::AudioGenerator				mGeneratorAudio;
+		xn::DepthGenerator				mGeneratorDepth;
+		xn::IRGenerator					mGeneratorInfrared;
+		xn::UserGenerator				mGeneratorUser;
+		xn::ImageGenerator				mGeneratorVideo;
 
 		uint_fast8_t					*mDataAudio;
 		volatile size_t					mDataAudioSize;
