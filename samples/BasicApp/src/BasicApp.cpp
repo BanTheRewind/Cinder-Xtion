@@ -34,7 +34,6 @@
 * 
 */
 
-// Includes
 #include "cinder/app/AppBasic.h"
 #include "cinder/Arcball.h"
 #include "cinder/Camera.h"
@@ -52,27 +51,20 @@ class BasicApp : public ci::app::AppBasic
 {
 
 public:
-
-	// Cinder callbacks
 	void draw();
 	void keyDown( ci::app::KeyEvent event );
 	void mouseDown( ci::app::MouseEvent event );
 	void mouseDrag( ci::app::MouseEvent event );
-	void prepareSettings( ci::app::AppBasic::Settings * settings );
+	void prepareSettings( ci::app::AppBasic::Settings* settings );
 	void shutdown();
 	void setup();
 	void update();
-
 private:
-
-	// Xtion
 	Xtion::DeviceRef		mDevice;
 	ci::Vec2i				mInputSize;
 
-	// Depth points
 	std::vector<ci::Vec3f>	mPoints;
 
-	// Camera
 	ci::Arcball				mArcball;
 	ci::CameraPersp			mCamera;
 
@@ -80,28 +72,21 @@ private:
 	ci::Surface8u			mVideo;
 	ci::Channel16u			mUserImage;
 
-	// Save screen shot
 	void					screenShot();
-
 };
 
-// Imports
 using namespace ci;
 using namespace ci::app;
-using namespace Xtion;
 using namespace std;
+using namespace Xtion;
 
-// Render
 void BasicApp::draw()
 {
-
-	// Clear window
 	gl::setViewport( getWindowBounds() );
 	gl::clear( Colorf::black() );
 
-	// Half window size
-	float width = getWindowCenter().x;
-	float height = getWindowCenter().y;
+	float width		= getWindowCenter().x;
+	float height	= getWindowCenter().y;
 
 	gl::setMatricesWindow( getWindowSize() );
 	gl::color( ColorAf::white() );
@@ -117,18 +102,16 @@ void BasicApp::draw()
 	gl::setMatrices( mCamera );
 	gl::rotate( mArcball.getQuat() );
 
-	// Draw point cloud
-	glBegin( GL_POINTS );
+	gl::begin( GL_POINTS );
 	for ( vector<Vec3f>::const_iterator pointIt = mPoints.cbegin(); pointIt != mPoints.cend(); ++pointIt ) {
 		float depth = 1.0f - pointIt->z / ( mCamera.getEyePoint().z * -2.0f );
 		gl::color( ColorAf( 1.0f, depth, 1.0f - depth, depth ) );
 		gl::vertex( *pointIt );
 	}
-	glEnd();
+	gl::end();
 
 }
 
-// Handles key press
 void BasicApp::keyDown( KeyEvent event )
 {
 	switch ( event.getCode() ) {
@@ -144,34 +127,29 @@ void BasicApp::keyDown( KeyEvent event )
 	}
 }
 
-void BasicApp::mouseDown( ci::app::MouseEvent event )
+void BasicApp::mouseDown( MouseEvent event )
 {
 	mArcball.mouseDown( event.getPos() );
 }
 
-void BasicApp::mouseDrag( ci::app::MouseEvent event )
+void BasicApp::mouseDrag( MouseEvent event )
 {
 	mArcball.mouseDrag( event.getPos() );
 }
 
-// Prepare window
-void BasicApp::prepareSettings( Settings * settings )
+void BasicApp::prepareSettings( Settings* settings )
 {
 	settings->setFrameRate( 60.0f );
 	settings->setWindowSize( 800, 600 );
 }
 
-// Take screen shot
 void BasicApp::screenShot()
 {
 	writeImage( getAppPath() / fs::path( "frame" + toString( getElapsedFrames() ) + ".png" ), copyWindowSurface() );
 }
 
-// Set up
 void BasicApp::setup()
 {
-
-	// Set up OpenGL
 	gl::enable( GL_DEPTH_TEST );
 	glHint( GL_POINT_SMOOTH_HINT, GL_NICEST );
 	glEnable( GL_POINT_SMOOTH );
@@ -182,30 +160,22 @@ void BasicApp::setup()
 
 	mInputSize = Vec2i::zero();
 
-	// Start Xtion
 	mDevice = Device::create();
-	mDevice->start( getAppPath() / "data/config.xml" );
+	mDevice->start( getAssetPath( "config.xml" ) );
 
-	// Set up camera
 	mArcball = Arcball( getWindowSize() );
 	mArcball.setRadius( (float)getWindowHeight() );
 	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 670.0f ), Vec3f::zero() );
 	mCamera.setPerspective( 60.0f, getWindowAspectRatio(), 0.01f, 5000.0f );
-
 }
 
-// Called on exit
 void BasicApp::shutdown()
 {
 	mDevice->stop();
-	mPoints.clear();
 }
 
-// Runs update logic
 void BasicApp::update()
 {
-
-	// Device is capturing
 	if ( mDevice->isCapturing() ) {
 		if ( mDevice->checkNewDepthFrame() ) {
 			mDepth = mDevice->getDepth();
@@ -217,8 +187,6 @@ void BasicApp::update()
 			mVideo = mDevice->getVideo();
 		}
 	}
-
 }
 
-// Run application
 CINDER_APP_BASIC( BasicApp, RendererGl )

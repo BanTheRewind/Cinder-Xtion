@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2012, Ban the Rewind
+* Copyright (c) 2013, Ban the Rewind
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -36,41 +36,101 @@
 
 #pragma once
 
+#include "boost/signals2.hpp"
+#include "cinder/AxisAlignedBox.h"
+#include "cinder/Quaternion.h"
 #include "cinder/Surface.h"
-#include "cinder/Thread.h"
 #include "cinder/Vector.h"
 #include "cinder/Utilities.h"
-#include "XnOpenNI.h"
-#include "XnCodecIDs.h"
-#include "XnCppWrapper.h"
+#include "OpenNI.h"
+#include "Nite.h"
 #include <map>
 
 namespace Xtion
 {
 
 	typedef std::shared_ptr<class Device>			DeviceRef;
-	typedef std::map<XnSkeletonJoint, class Bone>	Skeleton;
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	bool								success( XnStatus status );
-	void								trace( const std::string &message );
+	typedef std::map<nite::JointType, class Bone>	Skeleton;
 	
+	class Device;
+	class Listener;
+
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	class Device;
+	class Hand
+	{
+	public:
+		const ci::Vec3f&	getPosition() const;
+	private:
+		Hand( const ci::Vec3f& position );
+
+		ci::Vec3f			mPosition;
+
+		friend class		Listener;
+	};
+
+	typedef std::map<int16_t, Hand>					HandMap;
+
+	class Gesture
+	{
+	public:
+		const ci::Vec3f&	getPosition() const;
+	private:
+		Gesture( const ci::Vec3f& position );
+
+		ci::Vec3f			mPosition;
+
+		friend class		Listener;
+	};
+
+	typedef std::map<nite::GestureType, Gesture>	GestureMap;
+
+	class HandFrame
+	{
+	public:
+		const GestureMap&	getGestures() const;
+		const HandMap&		getHands() const;
+	private:
+		HandFrame( const HandMap& hands, const GestureMap& gestures );
+
+		GestureMap			mGestures;
+		HandMap				mHands;
+	};
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
 	class Bone
 	{
 	public:
-		const ci::Vec3f&				getPosition() const;
+		const ci::Vec3f&	getPosition() const;
+		const ci::Quatf&	getRotation() const;
 	private:
-		Bone( XnSkeletonJoint jointName, const ci::Vec3f &position );
+		Bone( const ci::Vec3f& position, const ci::Quatf& rotation );
 		
-		XnSkeletonJoint					mJointName;
-		ci::Vec3f						mPosition;
+		ci::Vec3f			mPosition;
+		ci::Quatf			mRotation;
 
-		friend class					Device;
+		friend class		Listener;
 	};
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	class User
+	{
+		const ci::AxisAlignedBox3f&	getBounds() const;
+		int16_t						getId() const;
+		const ci::Vec3f&			getPosition() const;
+		const Skeleton&				getSkeleton() const;
+	private:
+		ci::AxisAlignedBox3f		mBounds;
+		int16_t						mId;
+		ci::Vec3f					mPosition;
+		Skeleton					mSkeleton;
+
+		friend class				Listener;
+	};
+
+	typedef std::map<int16_t, User>	UserMap;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,69 +138,138 @@ namespace Xtion
 	{
 	public:
 		DeviceOptions();
-
-		static ci::Vec2i	getResolutionSize( XnResolution resolution );
-
-		DeviceOptions&		enableAudio( bool enable = true );
-		DeviceOptions&		enableDepth( bool enable = true );
-		DeviceOptions&		enableInfrared( bool enable = true );
-		DeviceOptions&		enableUserTracking( bool enable = true, bool trackSkeletons = true );
-		DeviceOptions&		enableVideo( bool enable = true );
 		
-		XnSampleRate		getAudioSampleRate() const;
-		float				getDepthFrameRate() const;
-		XnResolution		getDepthResolution() const; 
-		const ci::Vec2i&	getDepthSize() const; 
+		bool				isColorEnabled() const;
+		bool				isDepthEnabled() const;
+		bool				isHandTrackingEnabled() const;
+		bool				isInfraredEnabled() const; 
+		bool				isUserTrackingEnabled() const;
+
 		const std::string&	getDeviceId() const;
 		int32_t				getDeviceIndex() const;
+
+		float				getColorFrameRate() const;
+		float				getDepthFrameRate() const;
 		float				getInfraredFrameRate() const;
-		XnResolution		getInfraredResolution() const; 
+		
+		const ci::Vec2i&	getColorSize() const; 
+		const ci::Vec2i&	getDepthSize() const; 
 		const ci::Vec2i&	getInfraredSize() const;
-		float				getVideoFrameRate() const;
-		XnResolution		getVideoResolution() const; 
-		const ci::Vec2i&	getVideoSize() const; 
+		
+		DeviceOptions&		enableDepth( bool enable = true );
+		DeviceOptions&		enableHandTracking( bool enable = true );
+		DeviceOptions&		enableInfrared( bool enable = true );
+		DeviceOptions&		enableUserTracking( bool enable = true );
+		DeviceOptions&		enableColor( bool enable = true );
 
-		bool				isAudioEnabled() const;
-		bool				isDepthEnabled() const;
-		bool				isInfraredEnabled() const; 
-		bool				isSkeletonTrackingEnabled() const;
-		bool				isUserTrackingEnabled() const;
-		bool				isVideoEnabled() const;
+		DeviceOptions&		setDeviceId( const std::string& id ); 
+		DeviceOptions&		setDeviceIndex( int32_t index ); 
 
-		DeviceOptions&		setAudioSampleRate( XnSampleRate sampleRate = XnSampleRate::XN_SAMPLE_RATE_44K ); 
-		DeviceOptions&		setDepthFrameRate( float frameRate = 30.0f ); 
-		DeviceOptions&		setDepthResolution( const ci::Vec2i &size );
-		DeviceOptions&		setDepthResolution( XnResolution resolution = XnResolution::XN_RES_QVGA ); 
-		DeviceOptions&		setDeviceId( const std::string &id = "" ); 
-		DeviceOptions&		setDeviceIndex( int32_t index = 0 ); 
-		DeviceOptions&		setInfraredResolution( const ci::Vec2i &size );
-		DeviceOptions&		setInfraredResolution( XnResolution resolution = XnResolution::XN_RES_QVGA ); 
-		DeviceOptions&		setInfraredFrameRate( float frameRate = 30.0f ); 
-		DeviceOptions&		setVideoResolution( const ci::Vec2i &size );
-		DeviceOptions&		setVideoResolution( XnResolution resolution = XnResolution::XN_RES_VGA ); 
-		DeviceOptions&		setVideoFrameRate( float frameRate = 30.0f ); 
+		DeviceOptions&		setColorFrameRate( float frameRate ); 
+		DeviceOptions&		setDepthFrameRate( float frameRate ); 
+		DeviceOptions&		setInfraredFrameRate( float frameRate );
+
+		DeviceOptions&		setColorSize( const ci::Vec2i& size );
+		DeviceOptions&		setDepthSize( const ci::Vec2i& size );
+		DeviceOptions&		setInfraredSize( const ci::Vec2i& size );
 	private:
-		bool				mEnabledAudio;
+		bool				mEnabledColor;
 		bool				mEnabledDepth;
+		bool				mEnabledHandTracking;
 		bool				mEnabledInfrared;
-		bool				mEnabledSkeletonTracking;
 		bool				mEnabledUserTracking;
-		bool				mEnabledVideo;
 
+		float				mFrameRateColor;
 		float				mFrameRateDepth;
 		float				mFrameRateInfrared;
-		float				mFrameRateVideo;
 
-		XnSampleRate		mAudioSampleRate;
-		XnResolution		mDepthResolution;
-		ci::Vec2i			mDepthSize;
-		XnResolution		mInfraredResolution;
-		ci::Vec2i			mInfraredSize;
-		XnResolution		mVideoResolution;
-		ci::Vec2i			mVideoSize;
-
+		ci::Vec2i			mSizeColor;
+		ci::Vec2i			mSizeDepth;
+		ci::Vec2i			mSizeInfrared;
+		
 		std::string			mDeviceId;
 		int32_t				mDeviceIndex;
+	};
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	
+	class ColorListener : public openni::VideoStream::NewFrameListener
+	{
+	public:
+		void						onNewFrame( openni::VideoStream& stream );
+
+		template<typename T, typename Y>
+		inline void connectEventHandler( T callback, Y* callbackObject )
+		{
+			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+		}
+	private:
+		openni::VideoFrameRef							mFrame;
+		boost::signals2::signal<void ( ci::Surface8u )>	mSignal;
+
+		friend class									Device;
+	};
+
+	class DepthListener : public openni::VideoStream::NewFrameListener
+	{
+	public:
+		void						onNewFrame( openni::VideoStream& stream );
+
+		template<typename T, typename Y>
+		inline void connectEventHandler( T callback, Y* callbackObject )
+		{
+			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+		}
+	private:
+		openni::VideoFrameRef							mFrame;
+		boost::signals2::signal<void ( ci::Channel8u )>	mSignal;
+
+		friend class									Device;
+	};
+
+	class HandListener : nite::HandTracker::NewFrameListener
+	{
+	public:
+		void						onNewFrame( nite::HandTracker& tracker );
+	private:
+		nite::HandTrackerFrameRef					mFrame;
+		boost::signals2::signal<void ( HandFrame )>	mSignal;
+
+		friend class				Device;
+	};
+
+	class InfraredListener : public openni::VideoStream::NewFrameListener
+	{
+	public:
+		void						onNewFrame( openni::VideoStream& stream );
+
+		template<typename T, typename Y>
+		inline void connectEventHandler( T callback, Y* callbackObject )
+		{
+			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+		}
+	private:
+		openni::VideoFrameRef								mFrame;
+		boost::signals2::signal<void ( ci::Channel16u )>	mSignal;
+
+		friend class										Device;
+	};
+
+	class UserListener : nite::UserTracker::NewFrameListener
+	{
+	public:
+		void						onNewFrame( nite::UserTracker& tracker );
+
+		template<typename T, typename Y>
+		inline void connectEventHandler( T callback, Y* callbackObject )
+		{
+			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+		}
+	private:
+		nite::UserTrackerFrameRef					mFrame;
+		boost::signals2::signal<void ( UserMap )>	mSignal;
+
+		friend class								Device;
 	};
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,143 +277,55 @@ namespace Xtion
 	class Device
 	{
 	public:
+		
 		static DeviceRef				create();
-		static void						release();
 		~Device();
 
-		bool							isCapturing() const;
-		bool							isPaused() const;
-		void							pause();
-		void							resume();
-		void							start( const DeviceOptions &deviceOptions = DeviceOptions() );
-		void							start( const ci::fs::path &configFilePath );
-		void							stop();
+		void							start( const DeviceOptions& deviceOptions = DeviceOptions() );
 
 		const DeviceOptions&			getDeviceOptions() const;
 
-		void							enableBinaryMode( bool enable = true, bool invertImage = false );
-		bool							isBinaryImageInverted() const;
-		bool							isBinaryModeEnabled() const;
-		void							enableUserColor( bool enable = true );
-		bool							isUserColorEnabled() const;
+		template<typename T, typename Y>
+		inline void connectColorEventHandler( T callback, Y* callbackObject )
+		{
+			mListenerColor.connectEventHandler( callback, callbackObject );
+		}
 
-		uint_fast8_t*					getAudio();
-		size_t							getAudioBufferSize() const;
-		bool							checkNewAudio();
+		template<typename T, typename Y>
+		inline void connectDepthEventHandler( T callback, Y* callbackObject )
+		{
+			mListenerDepth.connectEventHandler( callback, callbackObject );
+		}
 
-		bool							checkNewDepthFrame();
-		ci::Channel16u					getDepth();
-		float							getDepthAt( const ci::Vec2i &position );
-		ci::Vec2i						getDepthSize();
-		
-		bool							checkNewInfraredFrame();
-		ci::Channel16u					getInfrared();
-		ci::Vec2i						getInfraredSize();
+		template<typename T, typename Y>
+		inline void connectHandEventHandler( T callback, Y* callbackObject )
+		{
+			mListenerHand.connectEventHandler( callback, callbackObject );
+		}
 
-		bool							checkNewUserData();
-		std::vector<Skeleton>			getSkeletons();
-		ci::Channel16u					getUserImage();
-		ci::Vec2i						getUserImageSize();
+		template<typename T, typename Y>
+		inline void connectInfraredEventHandler( T callback, Y* callbackObject )
+		{
+			mListenerInfrared.connectEventHandler( callback, callbackObject );
+		}
 
-		bool							checkNewVideoFrame();
-		ci::Surface8u					getVideo();
-		ci::Vec2i						getVideoSize();
-
-		ci::Vec2i						getSkeletonDepthPos( const ci::Vec3f &position );
-		ci::Vec2i						getSkeletonInfraredPos( const ci::Vec3f &position );
-		ci::Vec2i						getSkeletonVideoPos( const ci::Vec3f &position );
-
-		size_t							getDeviceCount() const;
+		template<typename T, typename Y>
+		inline void connectUserEventHandler( T callback, Y* callbackObject )
+		{
+			mListenerUser.connectEventHandler( callback, callbackObject );
+		}
 	private:
-		typedef std::shared_ptr<boost::thread>	ThreadRef;
-		
 		Device();
-
-		static const uint32_t MAX_COUNT	= 6;
-
-		void							init();
-
-		XnCallbackHandle				mCallbackCalibration;
-		XnCallbackHandle				mCallbackPose;
-		XnCallbackHandle				mCallbackUser;
-
-		static void XN_CALLBACK_TYPE	onCalibrationEnd( xn::SkeletonCapability &capability, XnUserID id, XnBool success, void *data );
-		static void XN_CALLBACK_TYPE	onNewUser( xn::UserGenerator &generator, XnUserID id, void *data );
-		static void XN_CALLBACK_TYPE	onPoseDetected( xn::PoseDetectionCapability &capability, const XnChar *pose, XnUserID id, void *data );
-		
-		void							onCalibrationEnd( xn::SkeletonCapability &capability, XnUserID id, XnBool success );
-		void							onNewUser( xn::UserGenerator &generator, XnUserID id );
-		void							onPoseDetected( xn::PoseDetectionCapability &capability, const XnChar *pose, XnUserID id );
-
-		XnChar							mPoseStr[ 20 ];
-
-		bool							mBinary;
-		bool							mCalibrationPoseRequired;
-		bool							mCapture;
-		bool							mGreyScale;
-		bool							mInverted;
-		bool							mPaused;
-		bool							mRemoveBackground;
-
-		XnUInt64						mLastUpdate;
-
-		std::string						mDeviceId;
-		size_t							mDeviceCount;
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
 		DeviceOptions					mDeviceOptions;
 
-		xn::Context						mContext;
-		xn::Device						mDevice;
-		xn::Query						mQuery;
-
-		xn::AudioMetaData				mMetaDataAudio;
-		xn::DepthMetaData				mMetaDataDepth;
-		xn::IRMetaData					mMetaDataInfrared;
-		xn::SceneMetaData				mMetaDataScene;
-		xn::ImageMetaData				mMetaDataVideo;
-
-		volatile bool					mRunning;
-		ThreadRef						mThread;
-		void							run();
-
-		boost::mutex					mMutex;
-		boost::mutex					mMutexAudio;
-		boost::mutex					mMutexDepth;
-		boost::mutex					mMutexInfrared;
-		boost::mutex					mMutexUser;
-		boost::mutex					mMutexVideo;
-
-		volatile bool					mNewAudio;
-		volatile bool					mNewDepthFrame;
-		volatile bool					mNewInfraredFrame;
-		volatile bool					mNewUserData;
-		volatile bool					mNewVideoFrame;
-
-		uint16_t						*mDataDepth;
-		uint16_t						*mDataInfrared;
-		uint16_t						*mDataUserImage;
-		uint8_t							*mDataVideo;
-
-		xn::AudioGenerator				mGeneratorAudio;
-		xn::DepthGenerator				mGeneratorDepth;
-		xn::IRGenerator					mGeneratorInfrared;
-		xn::UserGenerator				mGeneratorUser;
-		xn::ImageGenerator				mGeneratorVideo;
-
-		uint_fast8_t					*mDataAudio;
-		volatile size_t					mDataAudioSize;
-		ci::Channel16u					mChannelDepth;
-		ci::Channel16u					mChannelInfrared;
-		ci::Channel16u					mChannelUserImage;
-		ci::Surface8u					mSurfaceVideo;
-		std::vector<Skeleton>			mSkeletons;
-
-		ci::Vec2i						mSizeDepth;
-		ci::Vec2i						mSizeInfrared;
-		ci::Vec2i						mSizeUserImage;
-		ci::Vec2i						mSizeVideo;
+		ColorListener					mListenerColor;
+		DepthListener					mListenerDepth;
+		HandListener					mListenerHand;
+		InfraredListener				mListenerInfrared;
+		UserListener					mListenerUser;
 	};
 
 }
