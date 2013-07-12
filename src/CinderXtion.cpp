@@ -47,34 +47,64 @@ namespace Xtion
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	Bone::Bone( const Vec3f& position, const Quatf& rotation )
-		: mPosition( position ), mRotation( rotation )
+	AxisAlignedBox3f toAxisAlignedBox3f( const nite::Point3f& aMin, const nite::Point3f& aMax )
 	{
+		return AxisAlignedBox3f( toVec3f( aMin ), toVec3f( aMax ) );
 	}
 
-	const Vec3f& Bone::getPosition() const
+	Planef toPlanef( const nite::Point3f& point, const nite::Point3f& normal )
 	{
-		return mPosition;
+		return Planef( toVec3f( point ), toVec3f( normal ) );
 	}
 
-	const Quatf& Bone::getRotation() const
+	Quatf toQuatf( const nite::Quaternion& q )
 	{
-		return mRotation;
+		return Quatf( q.w, q.x, q.y, q.z );
+	}
+
+	Vec3f toVec3f( const nite::Point3f& v )
+	{
+		return Vec3f( v.x, v.y, v.z );
+	}
+
+	template<typename T>
+	vector<T> toVector( const nite::Array<T>& a )
+	{
+		vector<T> v;
+		v.insert( v.end(), &a[ 0 ], &a[ a.getSize() / sizeof( T ) ]);
+		return v;
+	}
+
+	Channel8u toChannel8u( const openni::VideoFrameRef& f )
+	{
+		return Channel8u( f.getWidth(), f.getHeight(), f.getStrideInBytes(), 1, (uint8_t*)f.getData() );
+	}
+	
+	Channel16u toChannel16u( const openni::VideoFrameRef& f )
+	{
+		return Channel16u( f.getWidth(), f.getHeight(), f.getStrideInBytes(), 1, (uint16_t*)f.getData() );
+	}
+
+	Surface8u toSurface8u( const openni::VideoFrameRef& f )
+	{
+		return Surface8u( (uint8_t*)f.getData(), f.getWidth(), f.getHeight(), f.getStrideInBytes(), SurfaceChannelOrder::RGB );
+	}
+	
+	Surface16u toSurface16u( const openni::VideoFrameRef& f )
+	{
+		return Surface16u( (uint16_t*)f.getData(), f.getWidth(), f.getHeight(), f.getStrideInBytes(), SurfaceChannelOrder::RGB );
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	DeviceOptions::DeviceOptions()
 	{
-		setDeviceId( "" );
-		setDeviceIndex( 0 );
-
 		enableColor( true );
 		enableDepth( true );
 		enableHandTracking( false );
 		enableInfrared( false );
 		enableUserTracking( false );
-		
+
 		setColorFrameRate( 30.0f );
 		setDepthFrameRate( 30.0f );
 		setInfraredFrameRate( 30.0f );
@@ -84,7 +114,60 @@ namespace Xtion
 		setInfraredSize( Vec2i( 320, 240 ) );
 	}
 
-	
+	bool DeviceOptions::isColorEnabled() const
+	{
+		return mEnabledColor;
+	}
+
+	bool DeviceOptions::isDepthEnabled() const
+	{
+		return mEnabledDepth;
+	}
+
+	bool DeviceOptions::isHandTrackingEnabled() const
+	{
+		return mEnabledHandTracking;
+	}
+
+	bool DeviceOptions::isInfraredEnabled() const
+	{
+		return mEnabledInfrared;
+	}
+
+	bool DeviceOptions::isUserTrackingEnabled() const
+	{
+		return mEnabledUserTracking;
+	}
+
+	float DeviceOptions::getColorFrameRate() const
+	{
+		return mFrameRateColor;
+	}
+
+	float DeviceOptions::getDepthFrameRate() const
+	{
+		return mFrameRateDepth;
+	}
+ 
+	float DeviceOptions::getInfraredFrameRate() const
+	{
+		return mFrameRateInfrared;
+	}
+
+	const Vec2i& DeviceOptions::getColorSize() const
+	{
+		return mSizeColor;
+	}
+
+	const Vec2i& DeviceOptions::getDepthSize() const
+	{
+		return mSizeDepth;
+	}
+
+	const Vec2i& DeviceOptions::getInfraredSize() const
+	{
+		return mSizeInfrared;
+	}
 
 	DeviceOptions& DeviceOptions::enableColor( bool enable )
 	{
@@ -98,105 +181,33 @@ namespace Xtion
 		return *this;
 	}
 
-	DeviceOptions& DeviceOptions::enableInfrared( bool enable )
-	{
-		mEnabledInfrared = enable;
-		return *this;
-	}
-
 	DeviceOptions& DeviceOptions::enableHandTracking( bool enable )
 	{
 		mEnabledHandTracking = enable;
 		return *this;
 	}
 
-	DeviceOptions& DeviceOptions::enableUserTracking( bool enable )
+	DeviceOptions& DeviceOptions::enableInfrared( bool enable )
 	{
-		mEnabledUserTracking		= enable;
+		mEnabledInfrared = enable;
 		return *this;
 	}
 
-	float DeviceOptions::getDepthFrameRate() const
+	DeviceOptions& DeviceOptions::enableUserTracking( bool enable )
 	{
-		return mFrameRateDepth;
-	}
- 
-	const Vec2i& DeviceOptions::getDepthSize() const
-	{
-		return mSizeDepth;
+		mEnabledUserTracking = enable;
+		return *this;
 	}
 
-	const std::string& DeviceOptions::getDeviceId() const
+	DeviceOptions& DeviceOptions::setColorFrameRate( float frameRate )
 	{
-		return mDeviceId;
-	}
-
-	int32_t DeviceOptions::getDeviceIndex() const
-	{
-		return mDeviceIndex;
-	}
-
-	float DeviceOptions::getInfraredFrameRate() const
-	{
-		return mFrameRateInfrared;
-	}
-
-	const Vec2i& DeviceOptions::getInfraredSize() const
-	{
-		return mSizeInfrared;
-	}
-
-	float  DeviceOptions::getColorFrameRate() const
-	{
-		return mFrameRateColor;
-	}
-
-	const Vec2i& DeviceOptions::getColorSize() const
-	{
-		return mSizeColor;
-	}
-
-	bool DeviceOptions::isColorEnabled() const
-	{
-		return mEnabledColor;
-	}
-
-	bool DeviceOptions::isDepthEnabled() const
-	{
-		return mEnabledDepth;
-	}
-
-	bool DeviceOptions::isInfraredEnabled() const
-	{
-		return mEnabledInfrared;
-	}
-
-	bool DeviceOptions::isUserTrackingEnabled() const
-	{
-		return mEnabledUserTracking;
+		mFrameRateColor = frameRate;
+		return *this;
 	}
 
 	DeviceOptions& DeviceOptions::setDepthFrameRate( float frameRate )
 	{
 		mFrameRateDepth = frameRate;
-		return *this;
-	}
-
-	DeviceOptions& DeviceOptions::setDepthSize( const Vec2i& size )
-	{
-		mSizeDepth = size;
-		return *this;
-	}
-
-	DeviceOptions& DeviceOptions::setDeviceId( const string& id )
-	{
-		mDeviceId = id;
-		return *this;
-	}
-
-	DeviceOptions& DeviceOptions::setDeviceIndex( int32_t index )
-	{
-		mDeviceIndex = index;
 		return *this;
 	}
 
@@ -206,71 +217,126 @@ namespace Xtion
 		return *this;
 	}
 
-	DeviceOptions& DeviceOptions::setInfraredSize( const Vec2i& size )
-	{
-		mSizeInfrared = size;
-		return *this;
-	}
-	
-	DeviceOptions& DeviceOptions::setColorFrameRate( float frameRate )
-	{
-		mFrameRateColor = frameRate;
-		return *this;
-	}
-
 	DeviceOptions& DeviceOptions::setColorSize( const Vec2i& size )
 	{
 		mSizeColor = size;
 		return *this;
 	}
 
+	DeviceOptions& DeviceOptions::setDepthSize( const Vec2i& size )
+	{
+		mSizeDepth = size;
+		return *this;
+	}
+
+	DeviceOptions& DeviceOptions::setInfraredSize( const Vec2i& size )
+	{
+		mSizeInfrared = size;
+		return *this;
+	}
+
 	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	void ColorListener::onNewFrame( openni::VideoStream& stream ) 
+	
+	HandTrackerListener::HandTrackerListener( HandTrackerListener::EventHandler eventHandler )
+		: nite::HandTracker::NewFrameListener(), mEventHandler( eventHandler )
 	{
-		stream.readFrame( &mFrame );
-	}
-
-	void DepthListener::onNewFrame( openni::VideoStream& stream ) 
-	{
-		stream.readFrame( &mFrame );
-	}
-
-	void HandListener::onNewFrame( nite::HandTracker& tracker )
-	{
-		tracker.readFrame( &mFrame );
-		// TODO parse and broadcast hand data
 	}
 	
-	void InfraredListener::onNewFrame( openni::VideoStream& stream ) 
+	UserTrackerListener::UserTrackerListener( UserTrackerListener::EventHandler eventHandler )
+		: nite::UserTracker::NewFrameListener(), mEventHandler( eventHandler )
 	{
-		stream.readFrame( &mFrame );
 	}
 
-	void UserListener::onNewFrame( nite::UserTracker& tracker )
+	VideoStreamListener::VideoStreamListener( VideoStreamListener::EventHandler eventHandler )
+		: openni::VideoStream::NewFrameListener(), mEventHandler( eventHandler )
+	{
+	}
+
+	void HandTrackerListener::onNewFrame( nite::HandTracker& tracker )
 	{
 		tracker.readFrame( &mFrame );
-		// TODO parse and broadcast user data
+		mEventHandler( mFrame );
+	}
+	
+	void UserTrackerListener::onNewFrame( nite::UserTracker& tracker )
+	{
+		tracker.readFrame( &mFrame );
+		mEventHandler( mFrame );
+	}
+
+	void VideoStreamListener::onNewFrame( openni::VideoStream& stream ) 
+	{
+		stream.readFrame( &mFrame );
+		mEventHandler( mFrame );
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	DeviceRef Device::create()
+	DeviceRef Device::create( const DeviceOptions& deviceOptions )
 	{
-		return DeviceRef( new Device() );
+		return DeviceRef( new Device( deviceOptions ) );
 	}
 
-	Device::Device()
+	Device::Device( const DeviceOptions& deviceOptions )
 	{
+		mDeviceOptions = deviceOptions;
 	}
 
 	Device::~Device()
 	{
 	}
 
-	void Device::start( const DeviceOptions& deviceOptions )
+	void Device::start()
 	{
-		mDeviceOptions = deviceOptions;
+		if ( mDeviceOptions.isColorEnabled() ) {
+			if ( mStreamColor.create( mDevice, openni::SENSOR_COLOR ) != openni::STATUS_OK ) {
+				mDeviceOptions.enableColor( false );
+			}
+		}
+
+		if ( mDeviceOptions.isDepthEnabled() ) {
+			if ( mStreamDepth.create( mDevice, openni::SENSOR_DEPTH ) != openni::STATUS_OK ) {
+				mDeviceOptions.enableDepth( false );
+			}
+		}
+
+		if ( mDeviceOptions.isHandTrackingEnabled() ) {
+			if ( mTrackerHand.create( &mDevice ) != nite::STATUS_OK ) {
+				mDeviceOptions.enableHandTracking( false );
+			}
+		}
+
+		if ( mDeviceOptions.isInfraredEnabled() ) {
+			if ( mStreamInfrared.create( mDevice, openni::SENSOR_IR ) != openni::STATUS_OK ) {
+				mDeviceOptions.enableInfrared( false );
+			}
+		}
+
+		if ( mDeviceOptions.isUserTrackingEnabled() ) {
+			if ( mTrackerUser.create( &mDevice ) != nite::STATUS_OK ) {
+				mDeviceOptions.enableUserTracking( false );
+			}
+		}
+	}
+
+	void Device::stop()
+	{
+
+	}
+	
+	const openni::Device& Device::getDevice() const
+	{
+		return mDevice;
+	}
+
+	const openni::DeviceInfo& Device::getDeviceInfo() const
+	{
+		return mDeviceInfo;
+	}
+
+	const DeviceOptions& Device::getDeviceOptions() const
+	{
+		return mDeviceOptions;
 	}
 
 }

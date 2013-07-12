@@ -1,6 +1,6 @@
 /*
 * 
-* Copyright (c) 2012, Ban the Rewind
+* Copyright (c) 2013, Ban the Rewind
 * All rights reserved.
 * 
 * Redistribution and use in source and binary forms, with or 
@@ -60,17 +60,8 @@ public:
 	void setup();
 	void update();
 private:
-	Xtion::DeviceRef		mDevice;
-	ci::Vec2i				mInputSize;
-
-	std::vector<ci::Vec3f>	mPoints;
-
 	ci::Arcball				mArcball;
 	ci::CameraPersp			mCamera;
-
-	ci::Channel16u			mDepth;
-	ci::Surface8u			mVideo;
-	ci::Channel16u			mUserImage;
 
 	void					screenShot();
 };
@@ -84,32 +75,6 @@ void BasicApp::draw()
 {
 	gl::setViewport( getWindowBounds() );
 	gl::clear( Colorf::black() );
-
-	float width		= getWindowCenter().x;
-	float height	= getWindowCenter().y;
-
-	gl::setMatricesWindow( getWindowSize() );
-	gl::color( ColorAf::white() );
-	if ( mDepth ) {
-		gl::draw( gl::Texture( mDepth ), mDepth.getBounds(), Rectf( 0.0f, height * 0.5f, width, height * 1.5f ) );
-	}
-	if ( mUserImage ) {
-		gl::draw( gl::Texture( mUserImage ), mUserImage.getBounds(), Rectf( 0.0f, height * 0.5f, width, height * 1.5f ) );
-	}
-	if ( mVideo ) {
-		gl::draw( gl::Texture( mVideo ), mVideo.getBounds(), Rectf( width, height * 0.5f, width * 2.0f, height * 1.5f ) );
-	}
-	gl::setMatrices( mCamera );
-	gl::rotate( mArcball.getQuat() );
-
-	gl::begin( GL_POINTS );
-	for ( vector<Vec3f>::const_iterator pointIt = mPoints.cbegin(); pointIt != mPoints.cend(); ++pointIt ) {
-		float depth = 1.0f - pointIt->z / ( mCamera.getEyePoint().z * -2.0f );
-		gl::color( ColorAf( 1.0f, depth, 1.0f - depth, depth ) );
-		gl::vertex( *pointIt );
-	}
-	gl::end();
-
 }
 
 void BasicApp::keyDown( KeyEvent event )
@@ -158,11 +123,6 @@ void BasicApp::setup()
 	gl::enableAdditiveBlending();
 	gl::color( ColorAf::white() );
 
-	mInputSize = Vec2i::zero();
-
-	mDevice = Device::create();
-	mDevice->start( getAssetPath( "config.xml" ) );
-
 	mArcball = Arcball( getWindowSize() );
 	mArcball.setRadius( (float)getWindowHeight() );
 	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 670.0f ), Vec3f::zero() );
@@ -171,22 +131,10 @@ void BasicApp::setup()
 
 void BasicApp::shutdown()
 {
-	mDevice->stop();
 }
 
 void BasicApp::update()
 {
-	if ( mDevice->isCapturing() ) {
-		if ( mDevice->checkNewDepthFrame() ) {
-			mDepth = mDevice->getDepth();
-		}
-		if ( mDevice->checkNewUserData() ) {
-			mUserImage = mDevice->getUserImage();
-		}
-		if ( mDevice->checkNewVideoFrame() ) {
-			mVideo = mDevice->getVideo();
-		}
-	}
 }
 
 CINDER_APP_BASIC( BasicApp, RendererGl )

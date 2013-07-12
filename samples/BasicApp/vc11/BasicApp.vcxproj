@@ -76,7 +76,7 @@
       <AdditionalIncludeDirectories>../../../../../include</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PreBuildEvent>
-      <Command>xcopy "$(OPENNI2_REDIST)\OpenNI2.dll" "$(ProjectDir)bin\" /Y /C
+      <Command>xcopy "$(OPENNI2_REDIST)OpenNI2.dll" "$(ProjectDir)bin\" /Y /C
 
 </Command>
     </PreBuildEvent>
@@ -109,7 +109,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <PreBuildEvent>
-      <Command>xcopy "$(OPENNI2_REDIST)\OpenNI2.dll" "$(ProjectDir)bin\" /Y /C
+      <Command>xcopy "$(OPENNI2_REDIST)OpenNI2.dll" "$(ProjectDir)bin\" /Y /C
 
 </Command>
     </PreBuildEvent>

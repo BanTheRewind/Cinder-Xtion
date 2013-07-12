@@ -38,6 +38,8 @@
 
 #include "boost/signals2.hpp"
 #include "cinder/AxisAlignedBox.h"
+#include "cinder/Channel.h"
+#include "cinder/Plane.h"
 #include "cinder/Quaternion.h"
 #include "cinder/Surface.h"
 #include "cinder/Vector.h"
@@ -48,92 +50,19 @@
 
 namespace Xtion
 {
+	ci::AxisAlignedBox3f	toAxisAlignedBox3f( const nite::Point3f& aMin, const nite::Point3f& aMax );
+	ci::Planef				toPlanef( const nite::Point3f& point, const nite::Point3f& normal );
+	ci::Quatf				toQuatf( const nite::Quaternion& q );
+	ci::Vec3f				toVec3f( const nite::Point3f& v );
 
-	typedef std::shared_ptr<class Device>			DeviceRef;
-	typedef std::map<nite::JointType, class Bone>	Skeleton;
+	template<typename T>
+	std::vector<T>			toVector( const nite::Array<T>& a );
+
+	ci::Channel8u			toChannel8u( const openni::VideoFrameRef& f );
+	ci::Channel16u			toChannel16u( const openni::VideoFrameRef& f );
+	ci::Surface8u			toSurface8u( const openni::VideoFrameRef& f );
+	ci::Surface16u			toSurface16u( const openni::VideoFrameRef& f );
 	
-	class Device;
-	class Listener;
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	class Hand
-	{
-	public:
-		const ci::Vec3f&	getPosition() const;
-	private:
-		Hand( const ci::Vec3f& position );
-
-		ci::Vec3f			mPosition;
-
-		friend class		Listener;
-	};
-
-	typedef std::map<int16_t, Hand>					HandMap;
-
-	class Gesture
-	{
-	public:
-		const ci::Vec3f&	getPosition() const;
-	private:
-		Gesture( const ci::Vec3f& position );
-
-		ci::Vec3f			mPosition;
-
-		friend class		Listener;
-	};
-
-	typedef std::map<nite::GestureType, Gesture>	GestureMap;
-
-	class HandFrame
-	{
-	public:
-		const GestureMap&	getGestures() const;
-		const HandMap&		getHands() const;
-	private:
-		HandFrame( const HandMap& hands, const GestureMap& gestures );
-
-		GestureMap			mGestures;
-		HandMap				mHands;
-	};
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	class Bone
-	{
-	public:
-		const ci::Vec3f&	getPosition() const;
-		const ci::Quatf&	getRotation() const;
-	private:
-		Bone( const ci::Vec3f& position, const ci::Quatf& rotation );
-		
-		ci::Vec3f			mPosition;
-		ci::Quatf			mRotation;
-
-		friend class		Listener;
-	};
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	class User
-	{
-		const ci::AxisAlignedBox3f&	getBounds() const;
-		int16_t						getId() const;
-		const ci::Vec3f&			getPosition() const;
-		const Skeleton&				getSkeleton() const;
-	private:
-		ci::AxisAlignedBox3f		mBounds;
-		int16_t						mId;
-		ci::Vec3f					mPosition;
-		Skeleton					mSkeleton;
-
-		friend class				Listener;
-	};
-
-	typedef std::map<int16_t, User>	UserMap;
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
 	class DeviceOptions
 	{
 	public:
@@ -145,9 +74,6 @@ namespace Xtion
 		bool				isInfraredEnabled() const; 
 		bool				isUserTrackingEnabled() const;
 
-		const std::string&	getDeviceId() const;
-		int32_t				getDeviceIndex() const;
-
 		float				getColorFrameRate() const;
 		float				getDepthFrameRate() const;
 		float				getInfraredFrameRate() const;
@@ -156,14 +82,11 @@ namespace Xtion
 		const ci::Vec2i&	getDepthSize() const; 
 		const ci::Vec2i&	getInfraredSize() const;
 		
+		DeviceOptions&		enableColor( bool enable = true );
 		DeviceOptions&		enableDepth( bool enable = true );
 		DeviceOptions&		enableHandTracking( bool enable = true );
 		DeviceOptions&		enableInfrared( bool enable = true );
 		DeviceOptions&		enableUserTracking( bool enable = true );
-		DeviceOptions&		enableColor( bool enable = true );
-
-		DeviceOptions&		setDeviceId( const std::string& id ); 
-		DeviceOptions&		setDeviceIndex( int32_t index ); 
 
 		DeviceOptions&		setColorFrameRate( float frameRate ); 
 		DeviceOptions&		setDepthFrameRate( float frameRate ); 
@@ -186,146 +109,138 @@ namespace Xtion
 		ci::Vec2i			mSizeColor;
 		ci::Vec2i			mSizeDepth;
 		ci::Vec2i			mSizeInfrared;
-		
-		std::string			mDeviceId;
-		int32_t				mDeviceIndex;
 	};
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	
-	class ColorListener : public openni::VideoStream::NewFrameListener
-	{
-	public:
-		void						onNewFrame( openni::VideoStream& stream );
+	class Device;
 
-		template<typename T, typename Y>
-		inline void connectEventHandler( T callback, Y* callbackObject )
-		{
-			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
-		}
-	private:
-		openni::VideoFrameRef							mFrame;
-		boost::signals2::signal<void ( ci::Surface8u )>	mSignal;
-
-		friend class									Device;
-	};
-
-	class DepthListener : public openni::VideoStream::NewFrameListener
-	{
-	public:
-		void						onNewFrame( openni::VideoStream& stream );
-
-		template<typename T, typename Y>
-		inline void connectEventHandler( T callback, Y* callbackObject )
-		{
-			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
-		}
-	private:
-		openni::VideoFrameRef							mFrame;
-		boost::signals2::signal<void ( ci::Channel8u )>	mSignal;
-
-		friend class									Device;
-	};
-
-	class HandListener : nite::HandTracker::NewFrameListener
+	class HandTrackerListener : nite::HandTracker::NewFrameListener
 	{
 	public:
 		void						onNewFrame( nite::HandTracker& tracker );
 	private:
-		nite::HandTrackerFrameRef					mFrame;
-		boost::signals2::signal<void ( HandFrame )>	mSignal;
+		typedef std::function<void ( nite::HandTrackerFrameRef )> EventHandler;
+		
+		HandTrackerListener( EventHandler eventHandler );
+
+		EventHandler				mEventHandler;
+		nite::HandTrackerFrameRef	mFrame;
+		
+		friend class				Device;
+	};
+
+	class UserTrackerListener : nite::UserTracker::NewFrameListener
+	{
+	public:
+		void						onNewFrame( nite::UserTracker& tracker );
+	private:
+		typedef std::function<void ( nite::UserTrackerFrameRef )> EventHandler;
+		
+		UserTrackerListener( EventHandler eventHandler );
+
+		EventHandler				mEventHandler;
+		nite::UserTrackerFrameRef	mFrame;
 
 		friend class				Device;
 	};
 
-	class InfraredListener : public openni::VideoStream::NewFrameListener
+	class VideoStreamListener : public openni::VideoStream::NewFrameListener
 	{
 	public:
-		void						onNewFrame( openni::VideoStream& stream );
-
-		template<typename T, typename Y>
-		inline void connectEventHandler( T callback, Y* callbackObject )
-		{
-			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
-		}
+		void					onNewFrame( openni::VideoStream& stream );
 	private:
-		openni::VideoFrameRef								mFrame;
-		boost::signals2::signal<void ( ci::Channel16u )>	mSignal;
+		typedef std::function<void ( openni::VideoFrameRef )> EventHandler;
+		
+		VideoStreamListener( EventHandler eventHandler );
 
-		friend class										Device;
-	};
+		EventHandler			mEventHandler;
+		openni::VideoFrameRef	mFrame;
 
-	class UserListener : nite::UserTracker::NewFrameListener
-	{
-	public:
-		void						onNewFrame( nite::UserTracker& tracker );
-
-		template<typename T, typename Y>
-		inline void connectEventHandler( T callback, Y* callbackObject )
-		{
-			mSignal.connect( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
-		}
-	private:
-		nite::UserTrackerFrameRef					mFrame;
-		boost::signals2::signal<void ( UserMap )>	mSignal;
-
-		friend class								Device;
+		friend class			Device;
 	};
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
+	
+	typedef std::shared_ptr<class Device>	DeviceRef;
+	typedef std::map<int16_t, DeviceRef>	DeviceMap;
 
 	class Device
 	{
 	public:
-		
-		static DeviceRef				create();
+		static DeviceRef			create( const DeviceOptions& deviceOptions = DeviceOptions() );
 		~Device();
 
-		void							start( const DeviceOptions& deviceOptions = DeviceOptions() );
+		void						start();
+		void						stop();
 
-		const DeviceOptions&			getDeviceOptions() const;
-
+		const openni::Device&		getDevice() const;
+		const openni::DeviceInfo&	getDeviceInfo() const;
+		const DeviceOptions&		getDeviceOptions() const;
+		
 		template<typename T, typename Y>
-		inline void connectColorEventHandler( T callback, Y* callbackObject )
+		inline void					connectColorEventHandler( T callback, Y* callbackObject )
 		{
-			mListenerColor.connectEventHandler( callback, callbackObject );
+			if ( mDeviceOptions.isColorEnabled() ) {
+				mListenerColor = std::shared_ptr<VideoStreamListener>( new VideoStreamListener( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+				mStreamColor.addNewFrameListener( *mListenerColor );
+			}
 		}
 
 		template<typename T, typename Y>
-		inline void connectDepthEventHandler( T callback, Y* callbackObject )
+		inline void					connectDepthEventHandler( T callback, Y* callbackObject )
 		{
-			mListenerDepth.connectEventHandler( callback, callbackObject );
+			if ( mDeviceOptions.isDepthEnabled() ) {
+				mListenerDepth = std::shared_ptr<VideoStreamListener>( new VideoStreamListener( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+				mStreamDepth.addNewFrameListener( *mListenerDepth );
+			}
 		}
 
 		template<typename T, typename Y>
-		inline void connectHandEventHandler( T callback, Y* callbackObject )
+		inline void					connectHandEventHandler( T callback, Y* callbackObject )
 		{
-			mListenerHand.connectEventHandler( callback, callbackObject );
+			if ( mDeviceOptions.isHandTrackingEnabled() ) {
+				mListenerHand = std::shared_ptr<HandTrackerListener>( new HandTrackerListener( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+				mTrackerHand.addNewFrameListener( *mListenerHand );
+			}
 		}
 
 		template<typename T, typename Y>
-		inline void connectInfraredEventHandler( T callback, Y* callbackObject )
+		inline void					connectInfraredEventHandler( T callback, Y* callbackObject )
 		{
-			mListenerInfrared.connectEventHandler( callback, callbackObject );
+			if ( mDeviceOptions.isInfraredEnabled() ) {
+				mListenerInfrared = std::shared_ptr<VideoStreamListener>( new VideoStreamListener( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+				mStreamInfrared.addNewFrameListener( *mListenerInfrared );
+			}
 		}
 
 		template<typename T, typename Y>
-		inline void connectUserEventHandler( T callback, Y* callbackObject )
+		inline void					connectUserEventHandler( T callback, Y* callbackObject )
 		{
-			mListenerUser.connectEventHandler( callback, callbackObject );
+			if ( mDeviceOptions.isUserTrackingEnabled() ) {
+				mListenerUser = std::shared_ptr<UserTrackerListener>( new UserTrackerListener( std::bind( callback, callbackObject, std::placeholders::_1 ) ) );
+				mTrackerUser.addNewFrameListener( *mListenerUser );
+			}
 		}
 	private:
-		Device();
+		Device( const DeviceOptions& deviceOptions );
 
-		//////////////////////////////////////////////////////////////////////////////////////////////
+		openni::Device							mDevice;
+		openni::DeviceInfo						mDeviceInfo;
 
-		DeviceOptions					mDeviceOptions;
+		DeviceOptions							mDeviceOptions;
 
-		ColorListener					mListenerColor;
-		DepthListener					mListenerDepth;
-		HandListener					mListenerHand;
-		InfraredListener				mListenerInfrared;
-		UserListener					mListenerUser;
+		openni::VideoStream						mStreamColor;
+		openni::VideoStream						mStreamDepth;
+		nite::HandTracker						mTrackerHand;
+		openni::VideoStream						mStreamInfrared;
+		nite::UserTracker						mTrackerUser;
+
+		std::shared_ptr<VideoStreamListener>	mListenerColor;
+		std::shared_ptr<VideoStreamListener>	mListenerDepth;
+		std::shared_ptr<HandTrackerListener>	mListenerHand;
+		std::shared_ptr<VideoStreamListener>	mListenerInfrared;
+		std::shared_ptr<UserTrackerListener>	mListenerUser;
 	};
 
 }
