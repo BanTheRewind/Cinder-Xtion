@@ -37,7 +37,6 @@
 #include "CinderXtion.h"
 
 #include "cinder/app/App.h"
-#include <Windows.h>
 
 namespace Xtion
 {
@@ -99,19 +98,17 @@ namespace Xtion
 
 	DeviceOptions::DeviceOptions()
 	{
-		enableColor( true );
+		enableColor( false );
 		enableDepth( true );
 		enableHandTracking( false );
 		enableInfrared( false );
 		enableUserTracking( false );
 
-		setColorFrameRate( 30.0f );
-		setDepthFrameRate( 30.0f );
-		setInfraredFrameRate( 30.0f );
-		
 		setColorSize( Vec2i( 320, 240 ) );
 		setDepthSize( Vec2i( 320, 240 ) );
 		setInfraredSize( Vec2i( 320, 240 ) );
+
+		setUri( "" );
 	}
 
 	bool DeviceOptions::isColorEnabled() const
@@ -169,6 +166,11 @@ namespace Xtion
 		return mSizeInfrared;
 	}
 
+	const string& DeviceOptions::getUri() const
+	{
+		return mUri;
+	}
+
 	DeviceOptions& DeviceOptions::enableColor( bool enable )
 	{
 		mEnabledColor = enable;
@@ -199,24 +201,6 @@ namespace Xtion
 		return *this;
 	}
 
-	DeviceOptions& DeviceOptions::setColorFrameRate( float frameRate )
-	{
-		mFrameRateColor = frameRate;
-		return *this;
-	}
-
-	DeviceOptions& DeviceOptions::setDepthFrameRate( float frameRate )
-	{
-		mFrameRateDepth = frameRate;
-		return *this;
-	}
-
-	DeviceOptions& DeviceOptions::setInfraredFrameRate( float frameRate )
-	{
-		mFrameRateInfrared = frameRate;
-		return *this;
-	}
-
 	DeviceOptions& DeviceOptions::setColorSize( const Vec2i& size )
 	{
 		mSizeColor = size;
@@ -235,8 +219,13 @@ namespace Xtion
 		return *this;
 	}
 
+	void DeviceOptions::setUri( const std::string& uri )
+	{
+		mUri = uri;
+	}
+
 	//////////////////////////////////////////////////////////////////////////////////////////////
-	
+
 	HandTrackerListener::HandTrackerListener( HandTrackerListener::EventHandler eventHandler )
 		: nite::HandTracker::NewFrameListener(), mEventHandler( eventHandler )
 	{
@@ -272,30 +261,109 @@ namespace Xtion
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	DeviceRef Device::create( const DeviceOptions& deviceOptions )
-	{
-		return DeviceRef( new Device( deviceOptions ) );
-	}
-
 	Device::Device( const DeviceOptions& deviceOptions )
 	{
-		mDeviceOptions = deviceOptions;
+		mConnected			= false;
+		mDeviceOptions		= deviceOptions;
+		mDeviceState		= openni::DeviceState::DEVICE_STATE_NOT_READY;
+
+		mListenerColor		= 0;
+		mListenerDepth		= 0;
+		mListenerHand		= 0;
+		mListenerInfrared	= 0;
+		mListenerUser		= 0;
 	}
 
 	Device::~Device()
 	{
+		if ( mListenerColor != 0 ) {
+			if ( mStreamColor.isValid() ) {
+				mStreamColor.removeNewFrameListener( mListenerColor );
+			}
+			delete mListenerColor;
+		}
+		if ( mListenerDepth != 0 ) {
+			if ( mStreamDepth.isValid() ) {
+				mStreamDepth.removeNewFrameListener( mListenerDepth );
+			}
+			delete mListenerDepth;
+		}
+		if ( mListenerHand != 0 ) {
+			if ( mTrackerHand.isValid() ) {
+				mTrackerHand.removeNewFrameListener( mListenerHand );
+			}
+			delete mListenerHand;
+		}
+		if ( mListenerInfrared != 0 ) {
+			if ( mStreamInfrared.isValid() ) {
+				mStreamInfrared.removeNewFrameListener( mListenerInfrared );
+			}
+			delete mListenerInfrared;
+		}
+		if ( mListenerUser != 0 ) {
+			if ( mTrackerUser.isValid() ) {
+				mTrackerUser.removeNewFrameListener( mListenerUser );
+			}
+			delete mListenerUser;
+		}
+		
+		stop();
+
+		if ( mStreamColor.isValid() ) {
+			mStreamColor.destroy();
+		}
+		if ( mStreamDepth.isValid() ) {
+			mStreamDepth.destroy();
+		}
+		if ( mTrackerHand.isValid() ) {
+			mTrackerHand.destroy();
+		}
+		if ( mStreamInfrared.isValid() ) {
+			mStreamInfrared.destroy();
+		}
+		if ( mTrackerUser.isValid() ) {
+			mTrackerUser.destroy();
+		}
+
+		mDevice.close();
 	}
 
 	void Device::start()
 	{
+		mDevice.open( mDeviceOptions.getUri().c_str() );
+
+		if ( mDevice.getSensorInfo( openni::SENSOR_COLOR ) == 0 ) {
+			mDeviceOptions.enableColor( false );
+		}
+		if ( mDevice.getSensorInfo( openni::SENSOR_DEPTH ) == 0 ) {
+			mDeviceOptions.enableDepth( false );
+			mDeviceOptions.enableHandTracking( false );
+			mDeviceOptions.enableUserTracking( false );
+		}
+		if ( mDevice.getSensorInfo( openni::SENSOR_IR ) == 0 ) {
+			mDeviceOptions.enableInfrared( false );
+		}
+
 		if ( mDeviceOptions.isColorEnabled() ) {
 			if ( mStreamColor.create( mDevice, openni::SENSOR_COLOR ) != openni::STATUS_OK ) {
+				openni::VideoMode mode;
+				mode.setFps( mDeviceOptions.getColorFrameRate() );
+				mode.setPixelFormat( openni::PixelFormat::PIXEL_FORMAT_RGB888 );
+				mode.setResolution( mDeviceOptions.getColorSize().x, mDeviceOptions.getColorSize().y );
+				mStreamColor.setVideoMode( mode );
+				mStreamColor.start();
 				mDeviceOptions.enableColor( false );
 			}
 		}
 
 		if ( mDeviceOptions.isDepthEnabled() ) {
 			if ( mStreamDepth.create( mDevice, openni::SENSOR_DEPTH ) != openni::STATUS_OK ) {
+				openni::VideoMode mode;
+				mode.setFps( mDeviceOptions.getDepthFrameRate() );
+				mode.setPixelFormat( openni::PixelFormat::PIXEL_FORMAT_DEPTH_1_MM );
+				mode.setResolution( mDeviceOptions.getDepthSize().x, mDeviceOptions.getDepthSize().y );
+				mStreamDepth.setVideoMode( mode );
+				mStreamDepth.start();
 				mDeviceOptions.enableDepth( false );
 			}
 		}
@@ -308,6 +376,12 @@ namespace Xtion
 
 		if ( mDeviceOptions.isInfraredEnabled() ) {
 			if ( mStreamInfrared.create( mDevice, openni::SENSOR_IR ) != openni::STATUS_OK ) {
+				openni::VideoMode mode;
+				mode.setFps( mDeviceOptions.getInfraredFrameRate() );
+				mode.setPixelFormat( openni::PixelFormat::PIXEL_FORMAT_GRAY8 );
+				mode.setResolution( mDeviceOptions.getInfraredSize().x, mDeviceOptions.getInfraredSize().y );
+				mStreamInfrared.setVideoMode( mode );
+				mStreamInfrared.start();
 				mDeviceOptions.enableInfrared( false );
 			}
 		}
@@ -321,7 +395,15 @@ namespace Xtion
 
 	void Device::stop()
 	{
-
+		if ( mStreamColor.isValid() ) {
+			mStreamColor.stop();
+		}
+		if ( mStreamDepth.isValid() ) {
+			mStreamDepth.stop();
+		}
+		if ( mStreamInfrared.isValid() ) {
+			mStreamInfrared.stop();
+		}
 	}
 	
 	const openni::Device& Device::getDevice() const
@@ -337,6 +419,231 @@ namespace Xtion
 	const DeviceOptions& Device::getDeviceOptions() const
 	{
 		return mDeviceOptions;
+	}
+
+	openni::DeviceState Device::getDeviceState() const
+	{
+		return mDeviceState;
+	}
+
+	openni::VideoStream& Device::getColorStream()
+	{
+		return mStreamColor;
+	}
+
+	const openni::VideoStream& Device::getColorStream() const
+	{
+		return mStreamColor;
+	}
+
+	openni::VideoStream& Device::getDepthStream()
+	{
+		return mStreamDepth;
+	}
+
+	const openni::VideoStream& Device::getDepthStream() const
+	{
+		return mStreamDepth;
+	}
+
+	nite::HandTracker& Device::getHandTracker()
+	{
+		return mTrackerHand;
+	}
+
+	const nite::HandTracker& Device::getHandTracker() const
+	{
+		return mTrackerHand;
+	}
+
+	openni::VideoStream& Device::getInfraredStream()
+	{
+		return mStreamInfrared;
+	}
+
+	const openni::VideoStream& Device::getInfraredStream() const
+	{
+		return mStreamInfrared;
+	}
+
+	nite::UserTracker& Device::getUserTracker()
+	{
+		return mTrackerUser;
+	}
+
+	const nite::UserTracker& Device::getUserTracker() const
+	{
+		return mTrackerUser;
+	}
+
+	bool Device::isConnected() const
+	{
+		return mConnected;
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	
+	DeviceManager::DeviceManager()
+		: mInitialized( false )
+	{
+	}
+
+	DeviceManager::~DeviceManager()
+	{
+		stop();
+		mDevices.clear();
+	}
+
+	DeviceRef DeviceManager::createDevice( const DeviceOptions& deviceOptions )
+	{
+		DeviceOptions options = deviceOptions;
+		string uri = options.getUri();
+		if ( !uri.empty() ) {
+
+			try {
+				DeviceRef device = getDevice( uri );
+				return device;
+			} catch ( ExcDeviceNotFound ex ) {
+			}
+
+			int32_t count = mDeviceInfoArray.getSize();
+			for ( int32_t i = 0; i < count; ++i ) {
+				if ( mDeviceInfoArray[ i ].getUri() == uri ) {
+					mDevices.push_back( new Device( deviceOptions ) );
+					return &mDevices[ mDevices.size() - 1 ];
+				}
+			}
+
+			throw ExcDeviceNotFound( uri );
+		}
+
+		int32_t count = mDeviceInfoArray.getSize();
+		for ( int32_t i = 0; i < count; ++i ) {
+			try {
+				DeviceRef device = getDevice( uri );
+			} catch ( ExcDeviceNotFound ex ) {
+				uri = mDeviceInfoArray[ i ].getUri();
+				options.setUri( uri );
+				mDevices.push_back( new Device( options ) );
+				return &mDevices[ mDevices.size() - 1 ];
+			}
+		}
+
+		throw ExcDeviceNotAvailable();
+	}
+
+	void DeviceManager::start()
+	{
+		console() << "test" << endl;
+		if ( openni::OpenNI::initialize() != openni::STATUS_OK ) {
+			console() << "Unable to initialize OpenNI: " << endl << openni::OpenNI::getExtendedError() << endl;
+			return;
+		}
+		if ( nite::NiTE::initialize() != nite::STATUS_OK ) {
+			console() << "Unable to initialize NiTE: " << endl << openni::OpenNI::getExtendedError() << endl;
+			return;
+		}
+		if ( openni::OpenNI::addDeviceConnectedListener( this ) != openni::STATUS_OK ) {
+			console() << "Unable to add device connected listener: " << endl << openni::OpenNI::getExtendedError() << endl;
+			return;
+		}
+		if ( openni::OpenNI::addDeviceDisconnectedListener( this ) != openni::STATUS_OK ) {
+			console() << "Unable to add device disconnected listener: " << endl << openni::OpenNI::getExtendedError() << endl;
+			return;
+		}
+		if ( openni::OpenNI::addDeviceStateChangedListener( this ) != openni::STATUS_OK ) {
+			console() << "Unable to add device state changed listener: " << endl << openni::OpenNI::getExtendedError() << endl;
+			return;
+		}
+		openni::OpenNI::enumerateDevices( &mDeviceInfoArray );
+		mInitialized = true;
+	}
+
+	void DeviceManager::stop()
+	{
+		if ( mInitialized ) {
+			openni::OpenNI::removeDeviceConnectedListener( this );
+			openni::OpenNI::removeDeviceDisconnectedListener( this );
+			openni::OpenNI::removeDeviceStateChangedListener( this );
+
+			try {
+				openni::OpenNI::shutdown();
+			} catch ( ... ) {
+			}
+
+			try {
+				nite::NiTE::shutdown();
+			} catch ( ... ) {
+			}
+
+			mInitialized = false;
+		}
+
+		openni::OpenNI::shutdown();
+	}
+
+	const openni::Array<openni::DeviceInfo>& DeviceManager::getDeviceInfoArray() const
+	{
+		return mDeviceInfoArray;
+	}
+
+	bool DeviceManager::isInitialized() const
+	{
+		return mInitialized;
+	}
+
+	DeviceRef DeviceManager::getDevice( const std::string& uri )
+	{
+		size_t i = 0;
+		for ( DeviceList::iterator iter = mDevices.begin(); iter != mDevices.end(); ++iter, ++i ) {
+			if ( iter->getDeviceOptions().getUri() == uri ) {
+				return &mDevices[ i ];
+			}
+		}
+		throw ExcDeviceNotFound( uri );	}
+
+	void DeviceManager::onDeviceStateChanged( const openni::DeviceInfo* info, openni::DeviceState state ) 
+	{
+		try {
+			DeviceRef device		= getDevice( info->getUri() );
+			device->mDeviceState	= state;
+		} catch ( ExcDeviceNotFound ex ) {
+		}
+	}
+
+	void DeviceManager::onDeviceConnected( const openni::DeviceInfo* info )
+	{
+		try {
+			DeviceRef device	= getDevice( info->getUri() );
+			device->mConnected	= true;
+		} catch ( ExcDeviceNotFound ex ) {
+		}
+
+		openni::OpenNI::enumerateDevices( &mDeviceInfoArray );
+	}
+
+	void DeviceManager::onDeviceDisconnected( const openni::DeviceInfo* info )
+	{
+		try {
+			DeviceRef device	= getDevice( info->getUri() );
+			device->mConnected	= false;
+			device->stop();
+		} catch ( ExcDeviceNotFound ex ) {
+		}
+
+		openni::OpenNI::enumerateDevices( &mDeviceInfoArray );
+	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	
+	ExcDeviceNotAvailable::ExcDeviceNotAvailable() throw()
+	{
+		sprintf( mMessage, "No free devices available" );
+	}
+
+	ExcDeviceNotFound::ExcDeviceNotFound( const string &uri ) throw()
+	{
+		sprintf( mMessage, "Could not find device: %s", uri.c_str() );
 	}
 
 }

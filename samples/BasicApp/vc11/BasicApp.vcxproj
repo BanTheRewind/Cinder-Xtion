@@ -78,6 +78,10 @@
     <PreBuildEvent>
       <Command>xcopy "$(OPENNI2_REDIST)OpenNI2.dll" "$(ProjectDir)bin\" /Y /C
 
+xcopy "$(NITE2_REDIST)NiTE2.dll" "$(ProjectDir)bin\" /Y /C
+
+xcopy "$(OPENNI2_REDIST)OpenNI2\Drivers\*.dll" "$(ProjectDir)bin\OpenNI2\Drivers\" /Y /C
+
 </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -110,6 +114,10 @@
     </Link>
     <PreBuildEvent>
       <Command>xcopy "$(OPENNI2_REDIST)OpenNI2.dll" "$(ProjectDir)bin\" /Y /C
+
+xcopy "$(NITE2_REDIST)NiTE2.dll" "$(ProjectDir)bin\" /Y /C
+
+xcopy "$(OPENNI2_REDIST)OpenNI2\Drivers\*.dll" "$(ProjectDir)bin\OpenNI2\Drivers\" /Y /C
 
 </Command>
     </PreBuildEvent>

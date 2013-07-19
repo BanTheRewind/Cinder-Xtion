@@ -51,15 +51,20 @@ class BasicApp : public ci::app::AppBasic
 {
 
 public:
-	void draw();
-	void keyDown( ci::app::KeyEvent event );
-	void mouseDown( ci::app::MouseEvent event );
-	void mouseDrag( ci::app::MouseEvent event );
-	void prepareSettings( ci::app::AppBasic::Settings* settings );
-	void shutdown();
-	void setup();
-	void update();
+	void					draw();
+	void					keyDown( ci::app::KeyEvent event );
+	void					mouseDown( ci::app::MouseEvent event );
+	void					mouseDrag( ci::app::MouseEvent event );
+	void					prepareSettings( ci::app::AppBasic::Settings* settings );
+	void					shutdown();
+	void					setup();
+	void					update();
 private:
+	void					onDepth( openni::VideoFrameRef frame );
+
+	Xtion::DeviceManager	mDeviceManager;
+	Xtion::DeviceRef		mDevice;
+
 	ci::Arcball				mArcball;
 	ci::CameraPersp			mCamera;
 
@@ -102,6 +107,11 @@ void BasicApp::mouseDrag( MouseEvent event )
 	mArcball.mouseDrag( event.getPos() );
 }
 
+void BasicApp::onDepth( openni::VideoFrameRef frame )
+{
+	console() << frame.getSensorType() << endl;
+}
+
 void BasicApp::prepareSettings( Settings* settings )
 {
 	settings->setFrameRate( 60.0f );
@@ -127,14 +137,29 @@ void BasicApp::setup()
 	mArcball.setRadius( (float)getWindowHeight() );
 	mCamera.lookAt( Vec3f( 0.0f, 0.0f, 670.0f ), Vec3f::zero() );
 	mCamera.setPerspective( 60.0f, getWindowAspectRatio(), 0.01f, 5000.0f );
+
+	mDeviceManager.start();
+
+	try {
+		mDevice = mDeviceManager.createDevice();
+	} catch ( ExcDeviceNotAvailable ex ) {
+		console() << ex.what() << endl;
+		quit();
+	}
+
+	mDevice->connectDepthEventHandler( &BasicApp::onDepth, this );
+	mDevice->start();
 }
 
 void BasicApp::shutdown()
 {
+	mDeviceManager.stop();
 }
 
 void BasicApp::update()
 {
+	//console() << mDeviceManager.getDeviceInfoArray().getSize() << " devices available" << endl;
+
 }
 
 CINDER_APP_BASIC( BasicApp, RendererGl )
